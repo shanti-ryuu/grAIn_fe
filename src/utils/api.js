@@ -55,7 +55,7 @@ export const MOCK_DATA = {
       id: 3,
       type: 'critical',
       title: 'Temperature Alert',
-      message: 'Room temperature below 50°F',
+      message: 'Room temperature below 10°C',
       timestamp: '30 minutes ago',
     },
   ],
@@ -115,7 +115,7 @@ export const controlDryer = async (action) => {
 };
 
 export const updateTemperature = async (temperature) => {
-  console.log(`[API] Setting temperature to ${temperature}°F`);
+  console.log(`[API] Setting temperature to ${temperature}°C`);
   return new Promise((resolve) => {
     setTimeout(() => {
       resolve({ success: true, temperature, timestamp: new Date().toISOString() });

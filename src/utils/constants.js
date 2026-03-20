@@ -46,7 +46,7 @@ export const DEVICE_STATUS = {
   ERROR: 'error',
 };
 
-// Temperature ranges (Fahrenheit)
+// Temperature ranges (Celsius)
 export const TEMPERATURE_RANGE = {
   MIN: 50,
   MAX: 200,

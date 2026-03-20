@@ -80,9 +80,9 @@ export default function DryerControl() {
           <Slider
             label="Temperature"
             value={temperature}
-            min={50}
-            max={200}
-            unit="°F"
+            min={20}
+            max={80}
+            unit="°C"
             onChange={handleTemperatureChange}
             disabled={!isRunning}
           />

@@ -57,7 +57,7 @@ export default function Dashboard({ onNavigate }) {
             <Card
               title="Temperature"
               value={data.temperature}
-              unit="°F"
+              unit="°C"
               onClick={() => onNavigate('control')}
               className="hover:shadow-ios-lg m-0"
             />
@@ -85,7 +85,7 @@ export default function Dashboard({ onNavigate }) {
           </div>
           <div className="group min-w-0">
             <Card
-              title="Energy Consumption"
+              title="Energy Usage"
               value={data.energyConsumption}
               unit="kWh"
               onClick={() => onNavigate('control')}

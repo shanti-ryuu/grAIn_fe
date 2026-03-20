@@ -29,7 +29,7 @@ export default async function handler(req, res) {
         id: 3,
         type: 'critical',
         title: 'Temperature Alert',
-        message: 'Room temperature below 50°F',
+        message: 'Room temperature below 10°C',
         timestamp: '30 minutes ago',
       },
     ];
