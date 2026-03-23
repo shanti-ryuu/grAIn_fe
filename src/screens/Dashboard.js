@@ -1,6 +1,16 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { Card, LoadingSkeleton } from '@/components';
+import {
+  Thermometer,
+  Droplets,
+  Activity,
+  Zap,
+  RotateCw,
+  Wind,
+  Clock,
+  Hourglass,
+} from 'lucide-react';
+import { LoadingSkeleton, StatusBadge, ProgressBar, SensorCard, StatItem, DryingSimulation } from '@/components';
 import { fetchDashboardData, logAuditAction } from '@/utils/api';
 import { useAppContext } from '@/context/AppContext';
 
@@ -21,7 +31,7 @@ export default function Dashboard({ onNavigate }) {
     } else {
       greetingText = 'Good evening';
     }
-    const userName = user?.email?.split('@')[0] || 'niggas';
+    const userName = user?.email?.split('@')[0] || 'Farmer';
     setGreeting(`${greetingText}, ${userName}`);
   }, [user]);
 
@@ -41,81 +51,128 @@ export default function Dashboard({ onNavigate }) {
     loadData();
   }, [setLoading]);
 
+  // Determine status color based on system state
+  const getSystemStatus = () => {
+    if (data.status === 'Running') return 'active';
+    return 'idle';
+  };
+
+  // Calculate drying progress (mock - in real app this comes from backend)
+  const dryingProgress = 45;
+  const timeRemaining = '2h 30m';
+
   return (
-    <div className="w-full animate-fade-in pb-8">
-      <div className="mb-8 sm:mb-10">
-        <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold text-ios-text capitalize mb-2">{greeting}</h1>
-        <div className="h-1 w-12 sm:w-16 bg-gradient-to-r from-grain-green to-grain-gold rounded-full" />
-        <p className="text-ios-text-tertiary mt-2 sm:mt-3 font-medium text-sm sm:text-base md:text-lg">Monitor your grain dryer in real-time</p>
+    <div className="w-full pb-8 animate-fade-in">
+      {/* Header Section */}
+      <div className="flex items-start justify-between gap-4 mb-8">
+        <div className="flex-1">
+          <h1 className="text-4xl font-bold text-ios-text mb-2">{greeting}</h1>
+          <p className="text-ios-text-tertiary font-medium">Monitor your grain dryer</p>
+        </div>
+        <StatusBadge status={getSystemStatus()} showLabel={true} />
       </div>
 
       {isLoading ? (
         <LoadingSkeleton count={4} />
       ) : (
-        <div className="grid grid-cols-2 gap-2.5 sm:gap-3 md:gap-4 mb-6 sm:mb-8">
-          <div className="group min-w-0">
-            <Card
+        <>
+          {/* Drying Simulation */}
+          <div className="mb-6 animate-slide-in-up">
+            <DryingSimulation
+              moistureLevel={data.moistureLevel}
+              isDrying={data.status === 'Running'}
+            />
+          </div>
+
+          {/* Drying Progress Section */}
+          <div className="bg-white rounded-md-ios border border-gray-200 p-6 shadow-ios-sm mb-6 animate-slide-in-up">
+            <ProgressBar
+              progress={dryingProgress}
+              timeRemaining={timeRemaining}
+              showLabel={true}
+              showTime={true}
+            />
+          </div>
+
+          {/* Sensor Grid - 2 columns */}
+          <div className="grid grid-cols-2 gap-4 mb-6 animate-slide-in-up">
+            <SensorCard
               title="Temperature"
               value={data.temperature}
               unit="°C"
+              icon={Thermometer}
+              status={data.temperature > 60 ? 'warning' : 'normal'}
               onClick={() => onNavigate('control')}
-              className="hover:shadow-ios-lg m-0"
             />
-            <p className="text-xs text-ios-text-tertiary text-center mt-2 opacity-0 group-hover:opacity-100 transition-opacity">Click to control</p>
-          </div>
-          <div className="group min-w-0">
-            <Card
+            <SensorCard
               title="Humidity"
               value={data.humidity}
               unit="%"
+              icon={Droplets}
+              status={data.humidity > 80 ? 'warning' : 'normal'}
               onClick={() => onNavigate('control')}
-              className="hover:shadow-ios-lg m-0"
             />
-            <p className="text-xs text-ios-text-tertiary text-center mt-2 opacity-0 group-hover:opacity-100 transition-opacity">Click to control</p>
-          </div>
-          <div className="group min-w-0">
-            <Card
-              title="Drying Time"
-              value={data.dryingTime}
-              unit="hrs"
+            <SensorCard
+              title="Moisture"
+              value={data.moistureLevel}
+              unit="%"
+              icon={Activity}
+              status={data.moistureLevel > 15 ? 'normal' : 'warning'}
               onClick={() => onNavigate('control')}
-              className="hover:shadow-ios-lg m-0"
             />
-            <p className="text-xs text-ios-text-tertiary text-center mt-2 opacity-0 group-hover:opacity-100 transition-opacity">Click to control</p>
-          </div>
-          <div className="group min-w-0">
-            <Card
-              title="Energy Usage"
+            <SensorCard
+              title="Energy"
               value={data.energyConsumption}
               unit="kWh"
+              icon={Zap}
+              status="normal"
               onClick={() => onNavigate('control')}
-              className="hover:shadow-ios-lg m-0"
             />
-            <p className="text-xs text-ios-text-tertiary text-center mt-2 opacity-0 group-hover:opacity-100 transition-opacity">Click to control</p>
           </div>
-        </div>
-      )}
 
-      <div className="backdrop-blur-xl bg-gradient-to-br from-white/20 to-white/10 border border-white/40 rounded-ios shadow-ios-xl p-6 animate-slide-in">
-        <div className="flex items-center gap-3 mb-6">
-          <h2 className="text-2xl font-bold text-ios-text">System Status</h2>
-          <div className="w-2 h-2 rounded-full bg-gradient-to-r from-grain-green to-grain-gold animate-pulse" />
-        </div>
-        <div className="grid grid-cols-1 gap-4">
-          <div className="flex items-center justify-between pb-4 border-b border-white/20 group hover:bg-white/5 px-3 py-2 rounded-ios transition-colors">
-            <span className="text-ios-text-secondary font-medium">Status</span>
-            <span className="font-bold text-grain-green text-lg group-hover:scale-105 transition-transform">{data.status}</span>
+          {/* System Status Cards */}
+          <div className="grid grid-cols-2 gap-4 mb-6 animate-slide-in-up">
+            <StatItem
+              label="Status"
+              value={data.status}
+              icon={RotateCw}
+            />
+            <StatItem
+              label="Fan Speed"
+              value={data.fanSpeed}
+              unit="%"
+              icon={Wind}
+            />
+            <StatItem
+              label="Duration"
+              value={data.dryingTime}
+              unit="hrs"
+              icon={Clock}
+            />
+            <StatItem
+              label="Time Running"
+              value="1h 45m"
+              icon={Hourglass}
+            />
           </div>
-          <div className="flex items-center justify-between pb-4 border-b border-white/20 group hover:bg-white/5 px-3 py-2 rounded-ios transition-colors">
-            <span className="text-ios-text-secondary font-medium">Fan Speed</span>
-            <span className="font-bold text-grain-green text-lg group-hover:scale-105 transition-transform">{data.fanSpeed}%</span>
+
+          {/* Quick Actions Section */}
+          <div className="bg-gradient-to-br from-grain-green/10 to-grain-gold/10 border border-grain-green/20 rounded-md-ios p-6 animate-slide-in-up">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-lg font-bold text-ios-text mb-1">System Running</h3>
+                <p className="text-sm text-ios-text-tertiary">Click below to adjust settings</p>
+              </div>
+              <button
+                onClick={() => onNavigate('control')}
+                className="px-6 py-3 bg-grain-green text-white font-semibold rounded-md-ios shadow-ios-md hover:shadow-ios-lg active:scale-95 transition-all"
+              >
+                Control
+              </button>
+            </div>
           </div>
-          <div className="flex items-center justify-between group hover:bg-white/5 px-3 py-2 rounded-ios transition-colors">
-            <span className="text-ios-text-secondary font-medium">Moisture Level</span>
-            <span className="font-bold text-grain-green text-lg group-hover:scale-105 transition-transform">{data.moistureLevel}%</span>
-          </div>
-        </div>
-      </div>
+        </>
+      )}
     </div>
   );
 }

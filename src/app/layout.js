@@ -4,8 +4,9 @@ import { AppProvider } from '@/context/AppContext';
 export const metadata = {
   title: 'grAIn - IoT Grain Dryer',
   description: 'Smart grain drying system with real-time monitoring and control',
-  viewport: 'width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1',
 };
+
+export const viewport = 'width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1';
 
 export default function RootLayout({ children }) {
   return (
