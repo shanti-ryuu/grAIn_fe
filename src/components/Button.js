@@ -1,42 +1,79 @@
-'use client';
-import { Loader } from 'lucide-react';
+import React from 'react';
+import { View, Text, TouchableOpacity, ActivityIndicator, StyleSheet } from 'react-native';
 
 export default function Button({
   label,
+  onPress,
   onClick,
   variant = 'primary',
   disabled = false,
   fullWidth = false,
   loading = false,
   children,
-  className = '',
+  style,
 }) {
-  const baseClasses =
-    'px-6 py-3 rounded-ios font-semibold transition-all focus:outline-none active:scale-95 text-base shadow-ios-sm flex items-center justify-center gap-2';
-  
-  const variantClasses = {
-    primary: 'bg-grain-green hover:bg-green-500 active:bg-green-600 text-white disabled:bg-gray-400 disabled:opacity-60',
-    secondary: 'bg-gray-300 hover:bg-gray-400 active:bg-gray-500 text-gray-900 disabled:bg-gray-300 disabled:opacity-60',
-    danger: 'bg-ios-red hover:bg-red-600 active:bg-red-700 text-white disabled:bg-gray-400 disabled:opacity-60',
-    outline: 'border-2 border-grain-green text-grain-green hover:bg-green-50 active:bg-green-100 disabled:opacity-60',
+  const variantStyles = {
+    primary: { backgroundColor: disabled ? '#9ca3af' : '#22c55e' },
+    secondary: { backgroundColor: disabled ? '#d1d5db' : '#d1d5db' },
+    danger: { backgroundColor: disabled ? '#9ca3af' : '#ef4444' },
+    outline: { backgroundColor: 'transparent', borderWidth: 2, borderColor: '#22c55e' },
   };
 
-  const widthClass = fullWidth ? 'w-full' : '';
+  const textColors = {
+    primary: '#ffffff',
+    secondary: '#111827',
+    danger: '#ffffff',
+    outline: '#22c55e',
+  };
 
   return (
-    <button
-      onClick={onClick}
+    <TouchableOpacity
+      onPress={onPress || onClick}
       disabled={disabled || loading}
-      className={`${baseClasses} ${variantClasses[variant] || variantClasses.primary} ${widthClass} ${className}`}
+      activeOpacity={0.7}
+      style={[
+        styles.base,
+        variantStyles[variant] || variantStyles.primary,
+        fullWidth && styles.fullWidth,
+        disabled && styles.disabled,
+        style,
+      ]}
     >
       {loading ? (
-        <>
-          <Loader className="w-4 h-4 animate-spin" />
-          <span>Loading...</span>
-        </>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="small" color={textColors[variant] || '#ffffff'} />
+          <Text style={[styles.text, { color: textColors[variant] || '#ffffff' }]}>Loading...</Text>
+        </View>
       ) : (
-        label || children
+        <Text style={[styles.text, { color: textColors[variant] || '#ffffff' }]}>{label || children}</Text>
       )}
-    </button>
+    </TouchableOpacity>
   );
 }
+
+const styles = StyleSheet.create({
+  base: {
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+    gap: 8,
+  },
+  fullWidth: {
+    width: '100%',
+  },
+  disabled: {
+    opacity: 0.6,
+  },
+  loadingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  text: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+});

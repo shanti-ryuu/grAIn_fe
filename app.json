@@ -1,0 +1,31 @@
+{
+  "expo": {
+    "name": "grAIn",
+    "slug": "grain-fe",
+    "version": "1.0.0",
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTabletMode": true,
+      "icon": "./public/logo/grain-logo.png"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./public/logo/grain-logo.png",
+        "backgroundColor": "#ffffff"
+      }
+    },
+    "web": {
+      "favicon": "./public/logo/grain-logo.png"
+    },
+    "plugins": [
+      [
+        "expo-secure-store",
+        {
+          "faceIDPermission": "Allow $(PRODUCT_NAME) to access your face ID"
+        }
+      ]
+    ]
+  }
+}
