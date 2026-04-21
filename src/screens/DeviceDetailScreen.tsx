@@ -4,351 +4,374 @@ import {
   Text,
   ScrollView,
   TouchableOpacity,
-  ActivityIndicator,
-  RefreshControl,
-  Alert,
   StyleSheet,
+  ActivityIndicator,
+  Alert,
+  StatusBar,
+  SafeAreaView,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useSensorData, useDevice } from '@/hooks';
+import { LinearGradient } from 'expo-linear-gradient';
+import { BlurView } from 'expo-blur';
+import * as Haptics from 'expo-haptics';
+import { useRouter } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
+import { useDevice, useSensorData } from '@/hooks';
+import { StatusBadge, Header, Navigation, DryingSimulation, ProgressBar } from '@/components';
 import { grainApi } from '@/api';
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#f5f5f5',
-  },
-  header: {
-    backgroundColor: '#2E7D32',
-    paddingHorizontal: 20,
-    paddingBottom: 20,
-    paddingTop: 12,
-  },
-  backButton: {
-    fontSize: 24,
-    marginBottom: 12,
-  },
-  deviceTitle: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: '#fff',
-    marginBottom: 4,
-  },
-  deviceStatus: {
-    fontSize: 14,
-    color: '#e8f5e9',
-  },
-  content: {
-    padding: 16,
-  },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#1a1a1a',
-    marginTop: 20,
-    marginBottom: 12,
-  },
-  sensorGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-  },
-  sensorCard: {
-    width: '48%',
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  sensorLabel: {
-    fontSize: 12,
-    color: '#666',
-    marginBottom: 8,
-    fontWeight: '500',
-  },
-  sensorValue: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: '#2E7D32',
-    marginBottom: 4,
-  },
-  sensorUnit: {
-    fontSize: 12,
-    color: '#999',
-  },
-  controlSection: {
-    marginTop: 24,
-    marginBottom: 32,
-  },
-  controlButton: {
-    height: 56,
-    borderRadius: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 12,
-    flexDirection: 'row',
-  },
-  startButton: {
-    backgroundColor: '#2E7D32',
-  },
-  stopButton: {
-    backgroundColor: '#d32f2f',
-  },
-  controlButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
-    marginLeft: 8,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  errorContainer: {
-    backgroundColor: '#ffebee',
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 16,
-  },
-  errorText: {
-    color: '#c62828',
-    fontSize: 14,
-  },
-  timestamp: {
-    fontSize: 12,
-    color: '#999',
-    marginTop: 12,
-    textAlign: 'center',
-  },
-});
+import { GRADIENTS, GLASS, IOS_TYPOGRAPHY } from '@/utils/constants';
 
 interface DeviceDetailScreenProps {
-  deviceId: string;
-  onBackPress?: () => void;
+  deviceId?: string;
 }
 
-export default function DeviceDetailScreen({
-  deviceId,
-  onBackPress,
-}: DeviceDetailScreenProps) {
-  const insets = useSafeAreaInsets();
-  const { device, isLoading: deviceLoading } = useDevice(deviceId);
-  const { sensorData, isLoading: sensorLoading, error, refetch } = useSensorData(deviceId);
-  const [refreshing, setRefreshing] = useState(false);
-  const [controlling, setControlling] = useState(false);
+function getGreeting(): string {
+  const hour = new Date().getHours();
+  if (hour < 12) return 'Good morning';
+  if (hour < 18) return 'Good afternoon';
+  return 'Good evening';
+}
 
-  const handleRefresh = async () => {
-    setRefreshing(true);
+export default function DeviceDetailScreen({ deviceId }: DeviceDetailScreenProps) {
+  const router = useRouter();
+  const { device, isLoading: deviceLoading, error: deviceError } = useDevice(deviceId);
+  const { latestData, sensorData, isLoading: sensorLoading, error: sensorError } = useSensorData(deviceId);
+  const [isControlling, setIsControlling] = useState(false);
+
+  const handleStartDryer = async () => {
+    if (!deviceId) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    setIsControlling(true);
     try {
-      await refetch();
+      await grainApi.dryer.start(deviceId, 'auto');
+    } catch (err: any) {
+      Alert.alert('Error', err?.message || 'Failed to start dryer');
     } finally {
-      setRefreshing(false);
+      setIsControlling(false);
     }
   };
 
-  const handleStartDryer = async () => {
-    Alert.alert(
-      'Start Dryer',
-      `Start drying on ${device?.name}?`,
-      [
-        {
-          text: 'Cancel',
-          onPress: () => {},
-          style: 'cancel',
-        },
-        {
-          text: 'Start',
-          onPress: async () => {
-            setControlling(true);
-            try {
-              await grainApi.device.startDryer(deviceId);
-              Alert.alert('Success', 'Dryer started successfully');
-              await refetch();
-            } catch (err) {
-              Alert.alert(
-                'Error',
-                err instanceof Error ? err.message : 'Failed to start dryer'
-              );
-            } finally {
-              setControlling(false);
-            }
-          },
-          style: 'default',
-        },
-      ]
-    );
-  };
-
   const handleStopDryer = async () => {
-    Alert.alert(
-      'Stop Dryer',
-      `Stop drying on ${device?.name}?`,
-      [
-        {
-          text: 'Cancel',
-          onPress: () => {},
-          style: 'cancel',
-        },
-        {
-          text: 'Stop',
-          onPress: async () => {
-            setControlling(true);
-            try {
-              await grainApi.device.stopDryer(deviceId);
-              Alert.alert('Success', 'Dryer stopped successfully');
-              await refetch();
-            } catch (err) {
-              Alert.alert(
-                'Error',
-                err instanceof Error ? err.message : 'Failed to stop dryer'
-              );
-            } finally {
-              setControlling(false);
-            }
-          },
-          style: 'destructive',
-        },
-      ]
-    );
+    if (!deviceId) return;
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+    setIsControlling(true);
+    try {
+      await grainApi.dryer.stop(deviceId);
+    } catch (err: any) {
+      Alert.alert('Error', err?.message || 'Failed to stop dryer');
+    } finally {
+      setIsControlling(false);
+    }
   };
 
-  if (deviceLoading || (!device && !sensorData)) {
+  if (deviceLoading) {
     return (
-      <View style={styles.container}>
-        <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
-          <TouchableOpacity onPress={onBackPress}>
-            <Text style={styles.backButton}>←</Text>
-          </TouchableOpacity>
-          <Text style={styles.deviceTitle}>Loading...</Text>
-        </View>
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#2E7D32" />
-        </View>
+      <View style={styles.loadingContainer}>
+        <StatusBar barStyle="dark-content" />
+        <LinearGradient colors={GRADIENTS.dashboard} style={styles.gradient}>
+          <ActivityIndicator size="large" color="#22C55E" />
+        </LinearGradient>
       </View>
     );
   }
 
-  return (
-    <View style={styles.container}>
-      <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
-        <TouchableOpacity onPress={onBackPress}>
-          <Text style={styles.backButton}>←</Text>
-        </TouchableOpacity>
-        <Text style={styles.deviceTitle}>{device?.name || 'Device Details'}</Text>
-        <Text style={styles.deviceStatus}>
-          Status: {device?.status || 'Unknown'}
-        </Text>
+  if (deviceError || !device) {
+    return (
+      <View style={styles.loadingContainer}>
+        <StatusBar barStyle="dark-content" />
+        <LinearGradient colors={GRADIENTS.dashboard} style={styles.gradient}>
+          <Ionicons name="alert-circle-outline" size={48} color="#EF4444" />
+          <Text style={styles.errorText}>{deviceError || 'Device not found'}</Text>
+          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+            <Text style={styles.backButtonText}>Go Back</Text>
+          </TouchableOpacity>
+        </LinearGradient>
       </View>
+    );
+  }
 
-      <ScrollView
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
-        }
-        contentContainerStyle={styles.content}
-      >
-        {error && (
-          <View style={styles.errorContainer}>
-            <Text style={styles.errorText}>⚠️ {error}</Text>
-          </View>
-        )}
+  const moisture = latestData?.moisture ?? 18.5;
+  const temperature = latestData?.temperature ?? 65.5;
+  const humidity = latestData?.humidity ?? 42.3;
+  const energy = latestData?.energy ?? 2.4;
+  const fanSpeed = latestData?.fanSpeed ?? 75;
+  const isOnline = device.status === 'online';
 
-        {sensorLoading && !sensorData ? (
-          <View style={[styles.loadingContainer, { height: 200 }]}>
-            <ActivityIndicator size="large" color="#2E7D32" />
-          </View>
-        ) : sensorData ? (
-          <>
-            <Text style={styles.sectionTitle}>📊 Sensor Readings</Text>
-            <View style={styles.sensorGrid}>
-              <View style={styles.sensorCard}>
-                <Text style={styles.sensorLabel}>Temperature</Text>
-                <Text style={styles.sensorValue}>{sensorData.temperature}°C</Text>
-                <Text style={styles.sensorUnit}>Current</Text>
-              </View>
-
-              <View style={styles.sensorCard}>
-                <Text style={styles.sensorLabel}>Humidity</Text>
-                <Text style={styles.sensorValue}>{sensorData.humidity}%</Text>
-                <Text style={styles.sensorUnit}>Relative</Text>
-              </View>
-
-              <View style={styles.sensorCard}>
-                <Text style={styles.sensorLabel}>Moisture</Text>
-                <Text style={styles.sensorValue}>{sensorData.moisture}%</Text>
-                <Text style={styles.sensorUnit}>Grain Level</Text>
-              </View>
-
-              {sensorData.fanSpeed !== undefined && (
-                <View style={styles.sensorCard}>
-                  <Text style={styles.sensorLabel}>Fan Speed</Text>
-                  <Text style={styles.sensorValue}>{sensorData.fanSpeed}%</Text>
-                  <Text style={styles.sensorUnit}>Output</Text>
-                </View>
-              )}
-
-              {sensorData.dryingTime !== undefined && (
-                <View style={styles.sensorCard}>
-                  <Text style={styles.sensorLabel}>Drying Time</Text>
-                  <Text style={styles.sensorValue}>{sensorData.dryingTime}h</Text>
-                  <Text style={styles.sensorUnit}>Elapsed</Text>
-                </View>
-              )}
-
-              {sensorData.energyConsumption !== undefined && (
-                <View style={styles.sensorCard}>
-                  <Text style={styles.sensorLabel}>Energy</Text>
-                  <Text style={styles.sensorValue}>{sensorData.energyConsumption}</Text>
-                  <Text style={styles.sensorUnit}>kWh</Text>
-                </View>
-              )}
+  return (
+    <SafeAreaView style={styles.container}>
+      <StatusBar barStyle="dark-content" />
+      <LinearGradient colors={GRADIENTS.dashboard} style={styles.gradient}>
+        <Header />
+        <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
+          <View style={styles.greetingRow}>
+            <View style={styles.greetingText}>
+              <Text style={styles.greeting}>{getGreeting()}, Farmer</Text>
+              <Text style={styles.greetingSub}>Monitor your grain dryer</Text>
             </View>
+            <StatusBadge status={isOnline ? 'running' : 'offline'} size="md" />
+          </View>
 
-            <Text style={styles.timestamp}>
-              Last updated: {new Date(sensorData.timestamp).toLocaleTimeString()}
-            </Text>
-          </>
-        ) : null}
+          <DryingSimulation moistureLevel={moisture} isDrying={isOnline} />
 
-        <View style={styles.controlSection}>
-          <Text style={styles.sectionTitle}>🎮 Controls</Text>
+          <BlurView intensity={GLASS.intensity} tint={GLASS.tint} style={styles.glassCard}>
+            <ProgressBar
+              progress={45}
+              timeRemaining="2h 30m"
+              showLabel={true}
+              showTime={true}
+            />
+          </BlurView>
 
-          <TouchableOpacity
-            style={[styles.controlButton, styles.startButton]}
-            onPress={handleStartDryer}
-            disabled={controlling}
-          >
-            {controlling ? (
-              <ActivityIndicator color="#fff" size="small" />
-            ) : (
-              <>
-                <Text style={{ fontSize: 20 }}>▶️</Text>
-                <Text style={styles.controlButtonText}>Start Dryer</Text>
-              </>
-            )}
-          </TouchableOpacity>
+          <View style={styles.sensorGrid}>
+            <BlurView intensity={GLASS.intensity} tint={GLASS.tint} style={styles.sensorCard}>
+              <View style={[styles.sensorIconBg, { backgroundColor: 'rgba(249,115,22,0.1)' }]}>
+                <Ionicons name="thermometer-outline" size={22} color="#F97316" />
+              </View>
+              <Text style={[styles.sensorValue, { color: '#F97316' }]}>{temperature} °C</Text>
+              <Text style={styles.sensorLabel}>TEMPERATURE</Text>
+            </BlurView>
+            <BlurView intensity={GLASS.intensity} tint={GLASS.tint} style={styles.sensorCard}>
+              <View style={[styles.sensorIconBg, { backgroundColor: 'rgba(34,197,94,0.1)' }]}>
+                <Ionicons name="water-outline" size={22} color="#22C55E" />
+              </View>
+              <Text style={[styles.sensorValue, { color: '#22C55E' }]}>{humidity} %</Text>
+              <Text style={styles.sensorLabel}>HUMIDITY</Text>
+            </BlurView>
+            <BlurView intensity={GLASS.intensity} tint={GLASS.tint} style={styles.sensorCard}>
+              <View style={[styles.sensorIconBg, { backgroundColor: 'rgba(34,197,94,0.1)' }]}>
+                <Ionicons name="analytics-outline" size={22} color="#22C55E" />
+              </View>
+              <Text style={[styles.sensorValue, { color: '#22C55E' }]}>{moisture} %</Text>
+              <Text style={styles.sensorLabel}>MOISTURE</Text>
+            </BlurView>
+            <BlurView intensity={GLASS.intensity} tint={GLASS.tint} style={styles.sensorCard}>
+              <View style={[styles.sensorIconBg, { backgroundColor: 'rgba(34,197,94,0.1)' }]}>
+                <Ionicons name="flash-outline" size={22} color="#22C55E" />
+              </View>
+              <Text style={[styles.sensorValue, { color: '#22C55E' }]}>{energy} kWh</Text>
+              <Text style={styles.sensorLabel}>ENERGY</Text>
+            </BlurView>
+          </View>
 
-          <TouchableOpacity
-            style={[styles.controlButton, styles.stopButton]}
-            onPress={handleStopDryer}
-            disabled={controlling}
-          >
-            {controlling ? (
-              <ActivityIndicator color="#fff" size="small" />
-            ) : (
-              <>
-                <Text style={{ fontSize: 20 }}>⏹️</Text>
-                <Text style={styles.controlButtonText}>Stop Dryer</Text>
-              </>
-            )}
-          </TouchableOpacity>
-        </View>
-      </ScrollView>
-    </View>
+          <View style={styles.rowCards}>
+            <BlurView intensity={GLASS.intensity} tint={GLASS.tint} style={styles.halfCard}>
+              <Text style={styles.cardLabel}>STATUS</Text>
+              <Text style={styles.cardValueGreen}>Running</Text>
+              <Text style={styles.cardSub}>Fan Speed: {fanSpeed} %</Text>
+            </BlurView>
+            <BlurView intensity={GLASS.intensity} tint={GLASS.tint} style={styles.halfCard}>
+              <Text style={styles.cardLabel}>DURATION</Text>
+              <Text style={styles.cardValue}>3.5 hrs</Text>
+              <Text style={styles.cardSub}>Time Running: 1h 45m</Text>
+            </BlurView>
+          </View>
+
+          <BlurView intensity={GLASS.intensity} tint={GLASS.tint} style={styles.bottomBanner}>
+            <View style={styles.bannerLeft}>
+              <View style={styles.bannerDot} />
+              <Text style={styles.bannerText}>System Running</Text>
+            </View>
+            <TouchableOpacity
+              style={styles.controlButton}
+              onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push('/(app)/control' as any); }}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.controlButtonText}>Control</Text>
+            </TouchableOpacity>
+          </BlurView>
+        </ScrollView>
+        <Navigation />
+      </LinearGradient>
+    </SafeAreaView>
   );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
+  gradient: {
+    flex: 1,
+  },
+  loadingContainer: {
+    flex: 1,
+  },
+  errorText: {
+    color: '#EF4444',
+    ...IOS_TYPOGRAPHY.footnote,
+  },
+  backButton: {
+    backgroundColor: '#22C55E',
+    paddingHorizontal: 24,
+    paddingVertical: 10,
+    borderRadius: 50,
+    marginTop: 8,
+  },
+  backButtonText: {
+    color: '#FFFFFF',
+    ...IOS_TYPOGRAPHY.headline,
+  },
+  scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
+    padding: 16,
+    paddingBottom: 72,
+    gap: 12,
+  },
+  greetingRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+  },
+  greetingText: {
+    flex: 1,
+  },
+  greeting: {
+    ...IOS_TYPOGRAPHY.largeTitle,
+    color: '#111111',
+  },
+  greetingSub: {
+    ...IOS_TYPOGRAPHY.footnote,
+    color: 'rgba(0,0,0,0.5)',
+    marginTop: 2,
+  },
+  glassCard: {
+    backgroundColor: GLASS.backgroundColor,
+    borderWidth: 1,
+    borderColor: GLASS.borderColor,
+    borderRadius: GLASS.borderRadius,
+    padding: 12,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: GLASS.shadowOpacity,
+    shadowRadius: GLASS.shadowRadius,
+    elevation: 5,
+  },
+  sensorGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  sensorCard: {
+    flex: 1,
+    minWidth: '45%',
+    backgroundColor: GLASS.backgroundColor,
+    borderWidth: 1,
+    borderColor: GLASS.borderColor,
+    borderRadius: GLASS.borderRadius,
+    padding: 10,
+    alignItems: 'center',
+    gap: 4,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: GLASS.shadowOpacity,
+    shadowRadius: GLASS.shadowRadius,
+    elevation: 5,
+  },
+  sensorIconBg: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  sensorValue: {
+    ...IOS_TYPOGRAPHY.title1,
+  },
+  sensorLabel: {
+    ...IOS_TYPOGRAPHY.caption2,
+    fontWeight: '600',
+    color: 'rgba(0,0,0,0.5)',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  rowCards: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  halfCard: {
+    flex: 1,
+    backgroundColor: GLASS.backgroundColor,
+    borderWidth: 1,
+    borderColor: GLASS.borderColor,
+    borderRadius: GLASS.borderRadius,
+    padding: 12,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: GLASS.shadowOpacity,
+    shadowRadius: GLASS.shadowRadius,
+    elevation: 5,
+  },
+  cardLabel: {
+    ...IOS_TYPOGRAPHY.caption2,
+    fontWeight: '600',
+    color: 'rgba(0,0,0,0.5)',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginBottom: 4,
+  },
+  cardValue: {
+    ...IOS_TYPOGRAPHY.title2,
+    color: '#111111',
+    marginBottom: 2,
+  },
+  cardValueGreen: {
+    ...IOS_TYPOGRAPHY.title2,
+    color: '#22C55E',
+    marginBottom: 2,
+  },
+  cardSub: {
+    ...IOS_TYPOGRAPHY.footnote,
+    color: 'rgba(0,0,0,0.5)',
+  },
+  bottomBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: GLASS.backgroundColor,
+    borderWidth: 1,
+    borderColor: GLASS.borderColor,
+    borderRadius: GLASS.borderRadius,
+    padding: 12,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: GLASS.shadowOpacity,
+    shadowRadius: GLASS.shadowRadius,
+    elevation: 5,
+  },
+  bannerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  bannerDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: '#22C55E',
+  },
+  bannerText: {
+    ...IOS_TYPOGRAPHY.headline,
+    color: '#111111',
+  },
+  controlButton: {
+    backgroundColor: '#22C55E',
+    paddingHorizontal: 24,
+    paddingVertical: 10,
+    borderRadius: 50,
+    shadowColor: '#22C55E',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  controlButtonText: {
+    color: '#FFFFFF',
+    ...IOS_TYPOGRAPHY.callout,
+    fontWeight: '600',
+  },
+});

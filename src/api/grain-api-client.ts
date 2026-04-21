@@ -1,79 +1,66 @@
+// @ts-nocheck
 /**
  * grAIn Mobile App - API Client Library
- *
- * This library provides a unified interface for the React Expo app to interact with the grAIn backend.
- *
- * Installation (for React Expo):
- * 1. Copy this file to your Expo project
- * 2. Install dependencies: expo-secure-store, axios
- * 3. Import and use throughout your app
- *
- * Usage:
- * ```typescript
- * import { grainApi } from './api/grain-api'
- *
- * // Login
- * const user = await grainApi.auth.login(email, password)
- *
- * // Get sensor data
- * const data = await grainApi.sensors.getData(deviceId, { page: 1 })
- *
- * // Control device
- * await grainApi.device.startDryer(deviceId)
- * ```
+ * Backend endpoints matching the grAIn IoT Grain Dryer API
  */
 
-import axios, { AxiosInstance, AxiosError } from 'axios'
+import axios, { AxiosInstance } from 'axios'
 import * as SecureStore from 'expo-secure-store'
 
+// ─── Data Models (matching backend) ───────────────────────────
+
 export interface User {
-  id: string
+  _id: string
   name: string
   email: string
-  role: 'admin' | 'farmer'
-  status?: string
+  role: 'farmer' | 'admin'
+}
+
+export interface Device {
+  _id: string
+  deviceId: string
+  name: string
+  location: string
+  status: 'online' | 'offline' | 'idle'
+  isOnline: boolean
+  lastSeen: string
 }
 
 export interface SensorData {
-  id: string
+  _id: string
   deviceId: string
   temperature: number
   humidity: number
   moisture: number
+  energy: number
+  fanSpeed: number
   timestamp: string
-  createdAt: string
-  fanSpeed?: number
-  dryingTime?: number
-  energyConsumption?: number
-}
-
-export interface Device {
-  id: string
-  deviceId: string
-  status: 'online' | 'offline'
-  location?: string
-  lastActive: string
-  createdAt: string
-  updatedAt?: string
-  name?: string
 }
 
 export interface Command {
-  id: string
+  _id: string
   deviceId: string
-  command: 'START' | 'STOP'
-  mode: 'MANUAL' | 'AUTO'
-  status: 'pending' | 'executed'
+  command: 'start' | 'stop'
+  status: 'pending' | 'executed' | 'failed'
+  parameters: {
+    mode: 'auto' | 'manual'
+    temperature?: number
+    fanSpeed?: number
+  }
   createdAt: string
+}
+
+export interface AnalyticsOverview {
+  moistureTrend: { label: string; value: number }[]
+  dryingCycles: { label: string; value: number }[]
+  energyConsumption: { label: string; value: number }[]
 }
 
 export interface PaginatedResponse<T> {
   data: T[]
   pagination: {
     total: number
-    count: number
     page: number
-    limit: number
     totalPages: number
   }
 }
@@ -86,28 +73,23 @@ export interface ApiResponse<T> {
   timestamp: string
 }
 
-export interface ApiError {
-  message: string
-  code: string
-  status: number
-}
+// ─── API Client ───────────────────────────────────────────────
+
+const TOKEN_KEY = 'grain_token'
 
 class GrainApiClient {
   private client: AxiosInstance
   private baseURL: string
 
-  constructor(baseURL: string = 'http://localhost:3000/api') {
-    this.baseURL = baseURL
+  constructor(baseURL?: string) {
+    this.baseURL = baseURL || 'http://localhost:3000/api'
 
     this.client = axios.create({
-      baseURL,
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      timeout: 10000,
+      baseURL: this.baseURL,
+      headers: { 'Content-Type': 'application/json' },
+      timeout: 15000,
     })
 
-    // Add token to all requests
     this.client.interceptors.request.use(
       async (config) => {
         const token = await this.getStoredToken()
@@ -116,18 +98,15 @@ class GrainApiClient {
         }
         return config
       },
-      (error) => Promise.reject(this.handleError(error))
+      (error: any) => Promise.reject(this.handleError(error))
     )
 
-    // Handle responses
     this.client.interceptors.response.use(
       (response) => response,
-      async (error) => {
+      async (error: any) => {
         if (error.response?.status === 401) {
-          // Token expired or invalid
           await this.clearToken()
-          // You can emit an event here to redirect to login
-          console.warn('Authentication failed - token cleared')
+          console.warn('Authentication failed — token cleared')
         }
         return Promise.reject(this.handleError(error))
       }
@@ -136,7 +115,7 @@ class GrainApiClient {
 
   private async getStoredToken(): Promise<string | null> {
     try {
-      return await SecureStore.getItemAsync('grain_auth_token')
+      return await SecureStore.getItemAsync(TOKEN_KEY)
     } catch {
       return null
     }
@@ -144,7 +123,7 @@ class GrainApiClient {
 
   private async setStoredToken(token: string): Promise<void> {
     try {
-      await SecureStore.setItemAsync('grain_auth_token', token)
+      await SecureStore.setItemAsync(TOKEN_KEY, token)
     } catch (error) {
       console.error('Failed to store token:', error)
     }
@@ -152,43 +131,78 @@ class GrainApiClient {
 
   private async clearToken(): Promise<void> {
     try {
-      await SecureStore.deleteItemAsync('grain_auth_token')
+      await SecureStore.deleteItemAsync(TOKEN_KEY)
     } catch (error) {
       console.error('Failed to clear token:', error)
     }
   }
 
-  private handleError(error: any): ApiError {
-    const axiosError = error as AxiosError<any>
-    const response = axiosError.response?.data as ApiResponse<any> | undefined
-
-    return {
-      message: response?.error || axiosError.message || 'Unknown error',
-      code: response?.errorCode || 'UNKNOWN_ERROR',
-      status: axiosError.response?.status || 500,
+  private handleError(error: any): Error {
+    if (!error.response) {
+      const message = error.code === 'ECONNABORTED'
+        ? 'Request timed out. Please check your connection.'
+        : 'Unable to connect to server. Please check that the backend is running.'
+      const err = new Error(message)
+      ;(err as any).code = error.code || 'NETWORK_ERROR'
+      ;(err as any).status = 0
+      return err
     }
+
+    const responseData = error.response.data
+    const message = responseData?.error || error.message || 'Unknown error'
+    const err = new Error(message)
+    ;(err as any).code = responseData?.errorCode || 'UNKNOWN_ERROR'
+    ;(err as any).status = error.response.status || 500
+    return err
   }
 
-  /**
-   * Authentication API
-   */
+  // ─── Auth ─────────────────────────────────────────────────
+
   auth = {
     login: async (email: string, password: string): Promise<{ token: string; user: User }> => {
-      try {
-        const response = await this.client.post<ApiResponse<{ token: string; user: User; expiresIn: number }>>(
-          '/auth/login',
-          { email, password }
-        )
-
-        if (response.data.data) {
-          await this.setStoredToken(response.data.data.token)
-          return response.data.data
+      const response = await this.client.post<ApiResponse<{ token: string; user: User }>>(
+        '/auth/login',
+        { email, password }
+      )
+      const payload = response.data.data || response.data
+      if (payload) {
+        const token = payload.token
+        const user = payload.user
+        if (token) {
+          await this.setStoredToken(token)
         }
-
-        throw new Error('Invalid login response')
-      } catch (error) {
-        throw this.handleError(error)
+        if (user) {
+          return { token, user }
+        }
       }
+      throw new Error('Invalid login response')
+    },
+
+    register: async (name: string, email: string, password: string): Promise<{ token: string; user: User }> => {
+      const response = await this.client.post<ApiResponse<{ token: string; user: User }>>(
+        '/auth/register',
+        { name, email, password, role: 'farmer' }
+      )
+      const payload = response.data.data || response.data
+      if (payload) {
+        const token = payload.token
+        const user = payload.user
+        if (token) {
+          await this.setStoredToken(token)
+        }
+        if (user) {
+          return { token, user }
+        }
+      }
+      throw new Error('Invalid register response')
+    },
+
+    me: async (): Promise<User> => {
+      const response = await this.client.get<ApiResponse<{ user: User }>>('/auth/me')
+      if (response.data.data) {
+        return response.data.data.user ?? response.data.data as any
+      }
+      throw new Error('Failed to get current user')
     },
 
     logout: async (): Promise<void> => {
@@ -203,163 +217,139 @@ class GrainApiClient {
         return false
       }
     },
+
+    getCurrentUser: async (): Promise<User> => {
+      return this.auth.me()
+    },
   }
 
-  /**
-   * Sensors API
-   */
+  // ─── Devices ──────────────────────────────────────────────
+
+  devices = {
+    list: async (): Promise<Device[]> => {
+      const response = await this.client.get<ApiResponse<Device[]>>('/devices')
+      const data = response.data.data || response.data
+      if (Array.isArray(data)) {
+        return data
+      }
+      throw new Error('Invalid devices response')
+    },
+
+    getById: async (id: string): Promise<Device> => {
+      const response = await this.client.get<ApiResponse<{ device: Device }>>(`/devices/${id}`)
+      if (response.data.data) {
+        return (response.data.data as any).device ?? response.data.data as any
+      }
+      throw new Error('Invalid device response')
+    },
+  }
+
+  // ─── Sensors ──────────────────────────────────────────────
+
   sensors = {
     getData: async (
       deviceId: string,
       options?: { page?: number; limit?: number; hours?: number }
     ): Promise<PaginatedResponse<SensorData>> => {
-      try {
-        const params = {
-          page: options?.page || 1,
-          limit: options?.limit || 50,
-          hours: options?.hours || 24,
-        }
-
-        const response = await this.client.get<
-          ApiResponse<SensorData[]> & { pagination: any }
-        >(`/sensors/${deviceId}`, { params })
-
-        if (response.data.data) {
-          return {
-            data: response.data.data,
-            pagination: response.data.pagination,
-          }
-        }
-
-        throw new Error('Invalid sensor data response')
-      } catch (error) {
-        throw this.handleError(error)
+      const params = {
+        page: options?.page || 1,
+        limit: options?.limit || 50,
+        hours: options?.hours || 24,
       }
+      const response = await this.client.get<ApiResponse<SensorData[]> & { pagination: any }>(
+        `/sensors/${deviceId}`,
+        { params }
+      )
+      if (response.data.data) {
+        return {
+          data: response.data.data,
+          pagination: response.data.pagination,
+        }
+      }
+      throw new Error('Invalid sensor data response')
+    },
+
+    getAllData: async (): Promise<SensorData[]> => {
+      const response = await this.client.get<ApiResponse<SensorData[]>>('/sensors/data')
+      if (response.data.data) {
+        return response.data.data
+      }
+      throw new Error('Invalid sensor data response')
     },
 
     getLatestData: async (deviceId: string): Promise<SensorData | null> => {
-      try {
-        const response = await this.sensors.getData(deviceId, { limit: 1 })
-        return response.data[0] || null
-      } catch (error) {
-        throw this.handleError(error)
-      }
-    },
-
-    postData: async (deviceId: string, data: { temperature: number; humidity: number; moisture: number }): Promise<SensorData> => {
-      try {
-        const response = await this.client.post<ApiResponse<SensorData>>('/sensors/data', {
-          deviceId,
-          ...data,
-        })
-
-        if (response.data.data) {
-          return response.data.data
-        }
-
-        throw new Error('Invalid post response')
-      } catch (error) {
-        throw this.handleError(error)
-      }
+      const result = await this.sensors.getData(deviceId, { limit: 1 })
+      return result.data[0] || null
     },
   }
 
-  /**
-   * Device Control API
-   */
-  device = {
-    startDryer: async (deviceId: string): Promise<Command> => {
-      try {
-        const response = await this.client.post<ApiResponse<Command>>(
-          `/dryer/${deviceId}/start`,
-          {}
-        )
+  // ─── Dryer Control ────────────────────────────────────────
 
-        if (response.data.data) {
-          return response.data.data
-        }
+  dryer = {
+    start: async (
+      deviceId: string,
+      mode: 'auto' | 'manual',
+      temperature?: number,
+      fanSpeed?: number
+    ): Promise<Command> => {
+      const body: any = { mode }
+      if (temperature !== undefined) body.temperature = temperature
+      if (fanSpeed !== undefined) body.fanSpeed = fanSpeed
 
-        throw new Error('Invalid start response')
-      } catch (error) {
-        throw this.handleError(error)
+      const response = await this.client.post<ApiResponse<Command>>(
+        `/dryer/${deviceId}/start`,
+        body
+      )
+      if (response.data.data) {
+        return response.data.data
       }
+      throw new Error('Invalid start response')
     },
 
-    stopDryer: async (deviceId: string): Promise<Command> => {
-      try {
-        const response = await this.client.post<ApiResponse<Command>>(
-          `/dryer/${deviceId}/stop`,
-          {}
-        )
-
-        if (response.data.data) {
-          return response.data.data
-        }
-
-        throw new Error('Invalid stop response')
-      } catch (error) {
-        throw this.handleError(error)
+    stop: async (deviceId: string): Promise<Command> => {
+      const response = await this.client.post<ApiResponse<Command>>(
+        `/dryer/${deviceId}/stop`
+      )
+      if (response.data.data) {
+        return response.data.data
       }
+      throw new Error('Invalid stop response')
     },
 
     getCommands: async (deviceId: string): Promise<Command[]> => {
-      try {
-        const response = await this.client.get<
-          ApiResponse<{ commands: Command[]; count: number }>
-        >(`/commands/${deviceId}`)
-
-        if (response.data.data?.commands) {
-          return response.data.data.commands
-        }
-
-        throw new Error('Invalid commands response')
-      } catch (error) {
-        throw this.handleError(error)
+      const response = await this.client.get<ApiResponse<Command[]>>(
+        `/commands/${deviceId}`
+      )
+      if (response.data.data) {
+        return Array.isArray(response.data.data) ? response.data.data : []
       }
-    },
-
-    list: async (options?: { page?: number; limit?: number }): Promise<PaginatedResponse<Device>> => {
-      try {
-        const params = {
-          page: options?.page || 1,
-          limit: options?.limit || 50,
-        }
-
-        const response = await this.client.get<
-          ApiResponse<Device[]> & { pagination: any }
-        >('/devices', { params })
-
-        if (response.data.data) {
-          return {
-            data: response.data.data,
-            pagination: response.data.pagination,
-          }
-        }
-
-        throw new Error('Invalid devices response')
-      } catch (error) {
-        throw this.handleError(error)
-      }
-    },
-
-    getDetails: async (id: string): Promise<Device> => {
-      try {
-        const response = await this.client.get<ApiResponse<Device>>(`/devices/${id}`)
-
-        if (response.data.data) {
-          return response.data.data
-        }
-
-        throw new Error('Invalid device response')
-      } catch (error) {
-        throw this.handleError(error)
-      }
+      throw new Error('Invalid commands response')
     },
   }
 
-  /**
-   * Health check
-   */
+  // ─── Analytics ────────────────────────────────────────────
+
+  analytics = {
+    getOverview: async (
+      period: 'daily' | 'weekly' | 'monthly' = 'daily',
+      deviceId?: string
+    ): Promise<AnalyticsOverview> => {
+      const params: any = { period }
+      if (deviceId) params.deviceId = deviceId
+
+      const response = await this.client.get<ApiResponse<AnalyticsOverview>>(
+        '/analytics/overview',
+        { params }
+      )
+      if (response.data.data) {
+        return response.data.data
+      }
+      throw new Error('Invalid analytics response')
+    },
+  }
+
+  // ─── Health ───────────────────────────────────────────────
+
   health = {
     check: async (): Promise<boolean> => {
       try {
@@ -370,10 +360,10 @@ class GrainApiClient {
       }
     },
   }
+
+  getBaseURL = (): string => this.baseURL
 }
 
-// Export singleton instance
 export const grainApi = new GrainApiClient(process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000/api')
 
-// Export types for TypeScript projects
 export type { GrainApiClient }

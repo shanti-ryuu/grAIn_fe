@@ -1,4 +1,4 @@
 export { useAuth } from './useAuth';
-export { useDevices } from './useDevices';
 export { useDevice } from './useDevice';
+export { useDevices } from './useDevices';
 export { useSensorData } from './useSensorData';

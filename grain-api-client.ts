@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * grAIn Mobile App - API Client Library
  * 

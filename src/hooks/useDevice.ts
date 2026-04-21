@@ -1,49 +1,36 @@
-import { useEffect, useState, useCallback } from 'react';
-import { Alert } from 'react-native';
-import { grainApi, Device } from '@/api';
+import { useState, useEffect, useCallback } from 'react';
+import { grainApi } from '@/api';
+import type { Device } from '@/api';
 
-export interface UseDeviceResult {
+interface UseDeviceResult {
   device: Device | null;
   isLoading: boolean;
   error: string | null;
   refetch: () => Promise<void>;
 }
 
-export function useDevice(deviceId: string): UseDeviceResult {
+export function useDevice(deviceId: string | undefined): UseDeviceResult {
   const [device, setDevice] = useState<Device | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const fetchDevice = useCallback(async () => {
     if (!deviceId) return;
-
     setIsLoading(true);
     setError(null);
     try {
-      const data = await grainApi.device.getDetails(deviceId);
+      const data = await grainApi.devices.getById(deviceId);
       setDevice(data);
-    } catch (err) {
-      const errorMessage =
-        err instanceof Error ? err.message : 'Failed to load device';
-      setError(errorMessage);
-      Alert.alert('Error', errorMessage);
+    } catch (err: any) {
+      setError(err?.message || 'Failed to fetch device');
     } finally {
       setIsLoading(false);
     }
   }, [deviceId]);
 
-  const refetch = useCallback(async () => {
-    await fetchDevice();
-  }, [fetchDevice]);
-
   useEffect(() => {
     fetchDevice();
   }, [fetchDevice]);
 
-  return {
-    device,
-    isLoading,
-    error,
-    refetch,
-  };
+  return { device, isLoading, error, refetch: fetchDevice };
 }

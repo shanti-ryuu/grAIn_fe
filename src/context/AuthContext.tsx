@@ -1,18 +1,6 @@
-import React, { createContext, useContext, useEffect, useReducer, useCallback } from 'react';
-import { grainApi, User as ApiUser } from '@/api';
-import * as SecureStore from 'expo-secure-store';
-
-export interface User extends ApiUser {}
-
-export interface AuthContextType {
-  user: User | null;
-  isAuthenticated: boolean;
-  isLoading: boolean;
-  error: string | null;
-  login: (email: string, password: string) => Promise<void>;
-  logout: () => Promise<void>;
-  clearError: () => void;
-}
+import React, { createContext, useContext, useReducer, useEffect, useCallback } from 'react';
+import { grainApi } from '@/api';
+import type { User } from '@/api';
 
 interface AuthState {
   user: User | null;
@@ -22,11 +10,10 @@ interface AuthState {
 }
 
 type AuthAction =
-  | { type: 'LOGIN_START' }
-  | { type: 'LOGIN_SUCCESS'; payload: User }
-  | { type: 'LOGIN_ERROR'; payload: string }
-  | { type: 'LOGOUT' }
-  | { type: 'RESTORE_TOKEN'; payload: User }
+  | { type: 'AUTH_START' }
+  | { type: 'AUTH_SUCCESS'; payload: User }
+  | { type: 'AUTH_ERROR'; payload: string }
+  | { type: 'AUTH_LOGOUT' }
   | { type: 'CLEAR_ERROR' };
 
 const initialState: AuthState = {
@@ -38,39 +25,14 @@ const initialState: AuthState = {
 
 function authReducer(state: AuthState, action: AuthAction): AuthState {
   switch (action.type) {
-    case 'LOGIN_START':
+    case 'AUTH_START':
       return { ...state, isLoading: true, error: null };
-    case 'LOGIN_SUCCESS':
-      return {
-        ...state,
-        user: action.payload,
-        isAuthenticated: true,
-        isLoading: false,
-        error: null,
-      };
-    case 'LOGIN_ERROR':
-      return {
-        ...state,
-        error: action.payload,
-        isLoading: false,
-        isAuthenticated: false,
-        user: null,
-      };
-    case 'LOGOUT':
-      return {
-        ...state,
-        user: null,
-        isAuthenticated: false,
-        isLoading: false,
-        error: null,
-      };
-    case 'RESTORE_TOKEN':
-      return {
-        ...state,
-        user: action.payload,
-        isAuthenticated: true,
-        isLoading: false,
-      };
+    case 'AUTH_SUCCESS':
+      return { ...state, isLoading: false, isAuthenticated: true, user: action.payload, error: null };
+    case 'AUTH_ERROR':
+      return { ...state, isLoading: false, isAuthenticated: false, user: null, error: action.payload };
+    case 'AUTH_LOGOUT':
+      return { ...initialState, isLoading: false };
     case 'CLEAR_ERROR':
       return { ...state, error: null };
     default:
@@ -78,55 +40,69 @@ function authReducer(state: AuthState, action: AuthAction): AuthState {
   }
 }
 
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
+interface AuthContextType {
+  user: User | null;
+  isAuthenticated: boolean;
+  isLoading: boolean;
+  error: string | null;
+  login: (email: string, password: string) => Promise<void>;
+  register: (name: string, email: string, password: string) => Promise<void>;
+  logout: () => Promise<void>;
+  clearError: () => void;
+}
+
+const AuthContext = createContext<AuthContextType>({
+  user: null,
+  isAuthenticated: false,
+  isLoading: true,
+  error: null,
+  login: async () => {},
+  register: async () => {},
+  logout: async () => {},
+  clearError: () => {},
+});
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [state, dispatch] = useReducer(authReducer, initialState);
 
-  // Check for existing token on app launch
   useEffect(() => {
-    const bootstrapAsync = async () => {
-      try {
-        const isAuthenticated = await grainApi.auth.isAuthenticated();
-        if (isAuthenticated) {
-          // Token exists, keep user authenticated
-          // Note: Full user data is returned from login() when user first logs in
-          // For now, we'll trust the token exists and set a generic user state
-          dispatch({
-            type: 'RESTORE_TOKEN',
-            payload: {
-              id: 'user',
-              email: '',
-              name: 'User',
-              role: 'farmer',
-            },
-          });
-        } else {
-          dispatch({ type: 'LOGOUT' });
-        }
-      } catch (error) {
-        dispatch({ type: 'LOGOUT' });
-      }
-    };
-
-    bootstrapAsync();
+    restoreAuth();
   }, []);
 
-  const login = useCallback(async (email: string, password: string) => {
-    dispatch({ type: 'LOGIN_START' });
+  const restoreAuth = async () => {
     try {
-      const response = await grainApi.auth.login(email, password);
-      dispatch({
-        type: 'LOGIN_SUCCESS',
-        payload: response.user,
-      });
+      const isAuth = await grainApi.auth.isAuthenticated();
+      if (isAuth) {
+        const user = await grainApi.auth.getCurrentUser();
+        dispatch({ type: 'AUTH_SUCCESS', payload: user });
+      } else {
+        dispatch({ type: 'AUTH_LOGOUT' });
+      }
     } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : 'Login failed. Please try again.';
-      dispatch({
-        type: 'LOGIN_ERROR',
-        payload: errorMessage,
-      });
+      dispatch({ type: 'AUTH_LOGOUT' });
+    }
+  };
+
+  const login = useCallback(async (email: string, password: string) => {
+    dispatch({ type: 'AUTH_START' });
+    try {
+      const { user } = await grainApi.auth.login(email, password);
+      dispatch({ type: 'AUTH_SUCCESS', payload: user });
+    } catch (error: any) {
+      const message = error?.message || 'Login failed';
+      dispatch({ type: 'AUTH_ERROR', payload: message });
+      throw error;
+    }
+  }, []);
+
+  const register = useCallback(async (name: string, email: string, password: string) => {
+    dispatch({ type: 'AUTH_START' });
+    try {
+      const { user } = await grainApi.auth.register(name, email, password);
+      dispatch({ type: 'AUTH_SUCCESS', payload: user });
+    } catch (error: any) {
+      const message = error?.message || 'Registration failed';
+      dispatch({ type: 'AUTH_ERROR', payload: message });
       throw error;
     }
   }, []);
@@ -137,7 +113,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } catch (error) {
       console.error('Logout error:', error);
     } finally {
-      dispatch({ type: 'LOGOUT' });
+      dispatch({ type: 'AUTH_LOGOUT' });
     }
   }, []);
 
@@ -145,23 +121,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     dispatch({ type: 'CLEAR_ERROR' });
   }, []);
 
-  const value: AuthContextType = {
-    user: state.user,
-    isAuthenticated: state.isAuthenticated,
-    isLoading: state.isLoading,
-    error: state.error,
-    login,
-    logout,
-    clearError,
-  };
-
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+  return (
+    <AuthContext.Provider
+      value={{
+        user: state.user,
+        isAuthenticated: state.isAuthenticated,
+        isLoading: state.isLoading,
+        error: state.error,
+        login,
+        register,
+        logout,
+        clearError,
+      }}
+    >
+      {children}
+    </AuthContext.Provider>
+  );
 }
 
-export function useAuth(): AuthContextType {
-  const context = useContext(AuthContext);
-  if (!context) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
-  return context;
-}
+export const useAuth = () => useContext(AuthContext);
+export default AuthContext;

@@ -1,25 +1,22 @@
 {
   "expo": {
     "name": "grAIn",
-    "slug": "grain-fe",
+    "slug": "grAIn-fe",
+    "scheme": "grain",
     "version": "1.0.0",
-    "assetBundlePatterns": [
-      "**/*"
-    ],
+    "platforms": ["ios", "android"],
     "ios": {
-      "supportsTabletMode": true,
-      "icon": "./public/logo/grain-logo.png"
+      "icon": "./assets/icon.png"
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./public/logo/grain-logo.png",
+        "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       }
     },
-    "web": {
-      "favicon": "./public/logo/grain-logo.png"
-    },
     "plugins": [
+      "expo-router",
+      "expo-secure-store",
       [
         "expo-secure-store",
         {

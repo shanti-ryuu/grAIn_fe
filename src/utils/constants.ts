@@ -1,0 +1,126 @@
+export const APP_NAME = 'grAIn';
+export const APP_VERSION = '0.1.0';
+
+export const COLORS = {
+  primary: '#22C55E',
+  primaryLight: 'rgba(34,197,94,0.15)',
+  primaryDark: '#16A34A',
+  background: '#F5F5F5',
+  card: '#FFFFFF',
+  textPrimary: '#111111',
+  textSecondary: '#6B7280',
+  orange: '#F97316',
+  red: '#EF4444',
+  gold: '#FFD700',
+  dark: '#000000',
+  light: '#F5F5F5',
+  white: '#FFFFFF',
+  gray: {
+    100: '#F3F4F6',
+    200: '#E5E7EB',
+    300: '#D1D5DB',
+    400: '#9CA3AF',
+    500: '#6B7280',
+    700: '#374151',
+  },
+  success: '#22C55E',
+  warning: '#FBBF24',
+  error: '#EF4444',
+  info: '#3B82F6',
+};
+
+export const GRADIENTS = {
+  login: ['#E8F5E9', '#F0FFF4', '#FFFFFF'] as const,
+  dashboard: ['#F0FFF4', '#E8F5E9', '#DCFCE7'] as const,
+  control: ['#FFF9F0', '#FFF3E0', '#F0FFF4'] as const,
+  analytics: ['#F0FFF4', '#E8F5E9', '#DCFCE7'] as const,
+  alerts: ['#FFF5F5', '#FEF2F2', '#F0FFF4'] as const,
+  settings: ['#F0FFF4', '#E8F5E9', '#DCFCE7'] as const,
+};
+
+export const GLASS = {
+  intensity: 80,
+  tint: 'light' as const,
+  backgroundColor: 'rgba(255,255,255,0.25)',
+  borderColor: 'rgba(255,255,255,0.4)',
+  borderRadius: 16,
+  shadowOpacity: 0.1,
+  shadowRadius: 20,
+  overflow: 'hidden' as const,
+};
+
+export const IOS_TYPOGRAPHY = {
+  largeTitle: { fontSize: 28, fontWeight: '700' as const },
+  title1: { fontSize: 22, fontWeight: '700' as const },
+  title2: { fontSize: 20, fontWeight: '700' as const },
+  title3: { fontSize: 18, fontWeight: '600' as const },
+  headline: { fontSize: 17, fontWeight: '600' as const },
+  body: { fontSize: 17, fontWeight: '400' as const },
+  callout: { fontSize: 16, fontWeight: '400' as const },
+  subhead: { fontSize: 15, fontWeight: '400' as const },
+  footnote: { fontSize: 13, fontWeight: '400' as const },
+  caption1: { fontSize: 12, fontWeight: '400' as const },
+  caption2: { fontSize: 11, fontWeight: '400' as const },
+};
+
+export const STATUS = {
+  RUNNING: 'running',
+  IDLE: 'idle',
+  PAUSED: 'paused',
+  ERROR: 'error',
+  MAINTENANCE: 'maintenance',
+};
+
+export const ALERT_TYPES = {
+  INFO: 'info',
+  WARNING: 'warning',
+  CRITICAL: 'critical',
+};
+
+export const DEVICE_STATUS = {
+  ACTIVE: 'active',
+  IDLE: 'idle',
+  OFFLINE: 'offline',
+  ERROR: 'error',
+};
+
+export const TEMPERATURE_RANGE = {
+  MIN: 50,
+  MAX: 200,
+  DEFAULT: 140,
+};
+
+export const HUMIDITY_RANGE = {
+  MIN: 0,
+  MAX: 100,
+  OPTIMAL_MIN: 30,
+  OPTIMAL_MAX: 60,
+};
+
+export const FAN_SPEED_RANGE = {
+  MIN: 0,
+  MAX: 100,
+  DEFAULT: 50,
+};
+
+export const TIME_INTERVALS = {
+  DAILY: 'daily',
+  WEEKLY: 'weekly',
+  MONTHLY: 'monthly',
+};
+
+export const NAVIGATION = [
+  { id: 'dashboard', label: 'Dashboard', icon: 'DashboardIcon' },
+  { id: 'control', label: 'Control', icon: 'ControlIcon' },
+  { id: 'analytics', label: 'Analytics', icon: 'AnalyticsIcon' },
+  { id: 'alerts', label: 'Alerts', icon: 'AlertsIcon' },
+  { id: 'settings', label: 'Settings', icon: 'SettingsIcon' },
+];
+
+export const DEFAULT_SETTINGS = {
+  temperatureUnit: 'F',
+  notifications: true,
+  darkMode: false,
+  autoStart: false,
+  maintenanceReminder: true,
+};

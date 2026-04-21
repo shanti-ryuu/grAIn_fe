@@ -1,70 +1,43 @@
-import { useEffect, useState, useCallback, useRef } from 'react';
-import { Alert } from 'react-native';
-import { grainApi, SensorData } from '@/api';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { grainApi } from '@/api';
+import type { SensorData } from '@/api';
 
-export interface UseSensorDataResult {
-  sensorData: SensorData | null;
+interface UseSensorDataResult {
+  sensorData: SensorData[];
+  latestData: SensorData | null;
   isLoading: boolean;
   error: string | null;
   refetch: () => Promise<void>;
 }
 
-const POLL_INTERVAL_MS = 30000; // 30 seconds
-
-export function useSensorData(deviceId: string): UseSensorDataResult {
-  const [sensorData, setSensorData] = useState<SensorData | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
+export function useSensorData(deviceId: string | undefined, pollInterval: number = 30000): UseSensorDataResult {
+  const [sensorData, setSensorData] = useState<SensorData[]>([]);
+  const [latestData, setLatestData] = useState<SensorData | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const fetchSensorData = useCallback(async () => {
+  const fetchData = useCallback(async () => {
     if (!deviceId) return;
-
-    setIsLoading(true);
-    setError(null);
     try {
-      const response = await grainApi.sensors.getData(deviceId);
-      setSensorData(response.data[0] || null);
-    } catch (err) {
-      const errorMessage =
-        err instanceof Error ? err.message : 'Failed to load sensor data';
-      setError(errorMessage);
-      console.error('Sensor data fetch error:', err);
-      // Don't show alert for every poll error
-      // Alert.alert('Error', errorMessage);
+      const data = await grainApi.sensors.getData(deviceId, { hours: 24 });
+      setSensorData(data.data);
+      setLatestData(data.data[0] || null);
+      setError(null);
+    } catch (err: any) {
+      setError(err?.message || 'Failed to fetch sensor data');
     } finally {
       setIsLoading(false);
     }
   }, [deviceId]);
 
-  const refetch = useCallback(async () => {
-    await fetchSensorData();
-  }, [fetchSensorData]);
-
-  // Set up polling
   useEffect(() => {
-    if (!deviceId) return;
-
-    // Fetch immediately
-    fetchSensorData();
-
-    // Set up interval for polling
-    pollIntervalRef.current = setInterval(() => {
-      fetchSensorData();
-    }, POLL_INTERVAL_MS);
-
-    // Cleanup interval on unmount or when deviceId changes
+    fetchData();
+    intervalRef.current = setInterval(fetchData, pollInterval);
     return () => {
-      if (pollIntervalRef.current) {
-        clearInterval(pollIntervalRef.current);
-      }
+      if (intervalRef.current) clearInterval(intervalRef.current);
     };
-  }, [deviceId, fetchSensorData]);
+  }, [fetchData, pollInterval]);
 
-  return {
-    sensorData,
-    isLoading: isLoading && sensorData === null, // Only show loading on first fetch
-    error,
-    refetch,
-  };
+  return { sensorData, latestData, isLoading, error, refetch: fetchData };
 }
