@@ -8,8 +8,8 @@ export default function RootLayout() {
     <AuthProvider>
       <AppProvider>
         <StatusBar style="dark" />
-        <Stack screenOptions={{ headerShown: false }}>
-          <Stack.Screen name="(auth)" />
+        <Stack screenOptions={{ headerShown: false, animation: 'slide_from_right' }}>
+          <Stack.Screen name="(auth)" options={{ animation: 'fade_from_bottom' }} />
           <Stack.Screen name="(app)" />
         </Stack>
       </AppProvider>

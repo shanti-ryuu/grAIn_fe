@@ -1,12 +1,14 @@
 import React, { useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, Switch, StyleSheet, Alert, StatusBar, SafeAreaView } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, Switch, StyleSheet, Alert } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { StatusBar } from 'expo-status-bar';
 import { LinearGradient } from 'expo-linear-gradient';
-import { BlurView } from 'expo-blur';
 import * as Haptics from 'expo-haptics';
 import { Ionicons } from '@expo/vector-icons';
+import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import { useAppContext } from '@/context/AppContext';
 import { Header, Navigation, StatusBadge } from '@/components';
-import { DEFAULT_SETTINGS, GRADIENTS, GLASS, IOS_TYPOGRAPHY } from '@/utils/constants';
+import { DEFAULT_SETTINGS, GRADIENTS, IOS_TYPOGRAPHY } from '@/utils/constants';
 
 export default function SettingsScreen() {
   const { handleLogout, showToast } = useAppContext();
@@ -26,14 +28,15 @@ export default function SettingsScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="dark-content" />
+    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+      <StatusBar style="dark" />
       <LinearGradient colors={GRADIENTS.settings} style={styles.gradient}>
         <Header />
+        <Animated.View entering={FadeIn.duration(200)} exiting={FadeOut.duration(150)} style={{ flex: 1 }}>
         <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
           <Text style={styles.screenTitle}>Settings</Text>
 
-          <BlurView intensity={GLASS.intensity} tint={GLASS.tint} style={styles.glassCard}>
+          <View style={styles.card}>
             <Text style={styles.cardLabel}>CONNECTED DEVICES</Text>
             <View style={styles.deviceRow}>
               <View style={styles.deviceInfo}>
@@ -55,9 +58,9 @@ export default function SettingsScreen() {
               </View>
               <StatusBadge status="offline" size="sm" />
             </View>
-          </BlurView>
+          </View>
 
-          <BlurView intensity={GLASS.intensity} tint={GLASS.tint} style={styles.glassCard}>
+          <View style={styles.card}>
             <Text style={styles.cardLabel}>PREFERENCES</Text>
 
             <View style={styles.settingRow}>
@@ -121,13 +124,14 @@ export default function SettingsScreen() {
                 thumbColor="#FFFFFF"
               />
             </View>
-          </BlurView>
+          </View>
 
           <TouchableOpacity style={styles.logoutButton} onPress={handleLogoutPress} activeOpacity={0.7}>
             <Ionicons name="log-out-outline" size={20} color="#FFFFFF" />
             <Text style={styles.logoutButtonText}>Logout</Text>
           </TouchableOpacity>
         </ScrollView>
+        </Animated.View>
         <Navigation />
       </LinearGradient>
     </SafeAreaView>
@@ -153,23 +157,21 @@ const styles = StyleSheet.create({
     ...IOS_TYPOGRAPHY.largeTitle,
     color: '#111111',
   },
-  glassCard: {
-    backgroundColor: GLASS.backgroundColor,
-    borderWidth: 1,
-    borderColor: GLASS.borderColor,
-    borderRadius: GLASS.borderRadius,
-    padding: 12,
+  card: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 16,
     overflow: 'hidden',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: GLASS.shadowOpacity,
-    shadowRadius: GLASS.shadowRadius,
-    elevation: 5,
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 3,
   },
   cardLabel: {
     ...IOS_TYPOGRAPHY.caption2,
     fontWeight: '600',
-    color: 'rgba(0,0,0,0.5)',
+    color: '#6B7280',
     textTransform: 'uppercase',
     letterSpacing: 0.5,
     marginBottom: 8,
@@ -180,7 +182,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(0,0,0,0.05)',
+    borderBottomColor: '#E5E7EB',
   },
   deviceInfo: {
     flexDirection: 'row',
@@ -197,7 +199,7 @@ const styles = StyleSheet.create({
   },
   deviceSub: {
     ...IOS_TYPOGRAPHY.footnote,
-    color: 'rgba(0,0,0,0.5)',
+    color: '#6B7280',
     marginTop: 2,
   },
   settingRow: {
@@ -206,7 +208,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(0,0,0,0.05)',
+    borderBottomColor: '#E5E7EB',
   },
   settingInfo: {
     flex: 1,
@@ -218,12 +220,12 @@ const styles = StyleSheet.create({
   },
   settingDesc: {
     ...IOS_TYPOGRAPHY.footnote,
-    color: 'rgba(0,0,0,0.5)',
+    color: '#6B7280',
     marginTop: 2,
   },
   unitToggle: {
     flexDirection: 'row',
-    backgroundColor: 'rgba(0,0,0,0.05)',
+    backgroundColor: '#F3F4F6',
     borderRadius: 50,
     padding: 2,
   },
@@ -233,7 +235,7 @@ const styles = StyleSheet.create({
     borderRadius: 50,
   },
   unitActive: {
-    backgroundColor: 'rgba(255,255,255,0.8)',
+    backgroundColor: '#FFFFFF',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
@@ -243,7 +245,7 @@ const styles = StyleSheet.create({
   unitText: {
     ...IOS_TYPOGRAPHY.callout,
     fontWeight: '600',
-    color: 'rgba(0,0,0,0.4)',
+    color: '#9CA3AF',
   },
   unitActiveText: {
     color: '#22C55E',

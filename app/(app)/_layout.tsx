@@ -19,13 +19,14 @@ export default function AppLayout() {
   }
 
   return (
-    <Stack screenOptions={{ headerShown: false }}>
+    <Stack screenOptions={{ headerShown: false, animation: 'slide_from_right' }}>
       <Stack.Screen name="dashboard" />
       <Stack.Screen name="control" />
       <Stack.Screen name="alerts" />
       <Stack.Screen name="analytics" />
       <Stack.Screen name="settings" />
       <Stack.Screen name="device/[id]" />
+      <Stack.Screen name="add-device" options={{ animation: 'slide_from_right' }} />
     </Stack>
   );
 }

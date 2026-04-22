@@ -1,15 +1,44 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { View, Animated, StyleSheet } from 'react-native';
 
 interface LoadingSkeletonProps {
   count?: number;
 }
 
-export default function LoadingSkeleton({ count = 1 }: LoadingSkeletonProps) {
+export default function LoadingSkeleton({ count = 3 }: LoadingSkeletonProps) {
+  const opacity = useRef(new Animated.Value(0.3)).current;
+
+  useEffect(() => {
+    const animation = Animated.loop(
+      Animated.sequence([
+        Animated.timing(opacity, {
+          toValue: 0.7,
+          duration: 800,
+          useNativeDriver: true,
+        }),
+        Animated.timing(opacity, {
+          toValue: 0.3,
+          duration: 800,
+          useNativeDriver: true,
+        }),
+      ])
+    );
+    animation.start();
+    return () => animation.stop();
+  }, [opacity]);
+
   return (
     <View style={styles.container}>
       {Array.from({ length: count }).map((_, i) => (
-        <Animated.View key={i} style={[styles.skeleton, { opacity: new Animated.Value(0.5) }]} />
+        <Animated.View key={i} style={[styles.skeletonCard, { opacity }]}>
+          <View style={styles.skeletonRow}>
+            <View style={styles.skeletonTextBlock}>
+              <View style={[styles.skeletonBar, { width: '60%' }]} />
+              <View style={[styles.skeletonBar, { width: '40%', marginTop: 8 }]} />
+            </View>
+            <View style={styles.skeletonBadge} />
+          </View>
+        </Animated.View>
       ))}
     </View>
   );
@@ -17,15 +46,30 @@ export default function LoadingSkeleton({ count = 1 }: LoadingSkeletonProps) {
 
 const styles = StyleSheet.create({
   container: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'center',
+    gap: 8,
   },
-  skeleton: {
-    backgroundColor: '#e5e7eb',
+  skeletonCard: {
+    backgroundColor: '#E5E7EB',
+    borderRadius: 16,
+    padding: 14,
+  },
+  skeletonRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  skeletonTextBlock: {
+    flex: 1,
+  },
+  skeletonBar: {
+    height: 14,
+    backgroundColor: '#D1D5DB',
+    borderRadius: 6,
+  },
+  skeletonBadge: {
+    width: 64,
+    height: 24,
+    backgroundColor: '#D1D5DB',
     borderRadius: 12,
-    height: 48,
-    width: '100%',
-    margin: 8,
   },
 });

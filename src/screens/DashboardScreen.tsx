@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import {
   View,
   Text,
@@ -6,24 +6,67 @@ import {
   RefreshControl,
   TouchableOpacity,
   StyleSheet,
-  ActivityIndicator,
-  StatusBar,
-  SafeAreaView,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { StatusBar } from 'expo-status-bar';
 import { LinearGradient } from 'expo-linear-gradient';
-import { BlurView } from 'expo-blur';
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
+import { ref, onValue, off } from 'firebase/database';
+import { db } from '@/lib/firebase';
 import { useDevices } from '@/hooks';
-import { Header, Navigation, StatusBadge } from '@/components';
-import { GRADIENTS, GLASS, IOS_TYPOGRAPHY } from '@/utils/constants';
+import { Header, Navigation, StatusBadge, LoadingSkeleton } from '@/components';
+import { GRADIENTS, IOS_TYPOGRAPHY } from '@/utils/constants';
 import type { Device } from '@/api';
+
+function SkeletonDeviceCards() {
+  return (
+    <View style={styles.skeletonContainer}>
+      {[1, 2, 3].map((i) => (
+        <View key={i} style={styles.skeletonCard}>
+          <View style={styles.skeletonRow}>
+            <View style={styles.skeletonTextBlock}>
+              <View style={[styles.skeletonBar, { width: '60%' }]} />
+              <View style={[styles.skeletonBar, { width: '40%', marginTop: 8 }]} />
+            </View>
+            <View style={styles.skeletonBadge} />
+          </View>
+        </View>
+      ))}
+    </View>
+  );
+}
 
 export default function DashboardScreen() {
   const router = useRouter();
-  const { devices, isLoading, error, refetch } = useDevices();
+  const { devices: apiDevices, isLoading, error, refetch } = useDevices();
+  const [devices, setDevices] = useState<Device[]>(apiDevices);
   const [refreshing, setRefreshing] = useState(false);
+
+  // Sync API devices into state
+  useEffect(() => {
+    setDevices(apiDevices);
+  }, [apiDevices]);
+
+  // Subscribe to Firebase realtime device statuses
+  useEffect(() => {
+    if (!db || apiDevices.length === 0) return
+
+    const statusRef = ref(db, 'grain/devices')
+    const unsubscribe = onValue(statusRef, (snapshot) => {
+      const firebaseDevices = snapshot.val()
+      if (firebaseDevices) {
+        setDevices(prev => prev.map(device => ({
+          ...device,
+          status: firebaseDevices[device.deviceId]?.status ?? device.status
+        })))
+      }
+    })
+
+    return () => off(statusRef)
+  }, [apiDevices.length])
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -36,61 +79,67 @@ export default function DashboardScreen() {
     router.push(`/(app)/device/${device._id}` as any);
   };
 
-  if (isLoading && devices.length === 0) {
-    return (
-      <View style={styles.loadingContainer}>
-        <StatusBar barStyle="dark-content" />
-        <LinearGradient colors={GRADIENTS.dashboard} style={styles.gradient}>
-          <ActivityIndicator size="large" color="#22C55E" />
-          <Text style={styles.loadingText}>Loading devices...</Text>
-        </LinearGradient>
-      </View>
-    );
-  }
+  const handleAddDevice = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    router.push('/(app)/add-device' as any);
+  };
 
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="dark-content" />
+    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+      <StatusBar style="dark" />
       <LinearGradient colors={GRADIENTS.dashboard} style={styles.gradient}>
         <Header />
-        <ScrollView
-          style={styles.scrollView}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#22C55E" />}
-          contentContainerStyle={styles.scrollContent}
-        >
-          <Text style={styles.sectionTitle}>Your Devices</Text>
-          {error ? (
-            <View style={styles.errorContainer}>
-              <Ionicons name="cloud-offline-outline" size={48} color="#6B7280" />
-              <Text style={styles.errorText}>{error}</Text>
-              <TouchableOpacity onPress={refetch} style={styles.retryButton} activeOpacity={0.7}>
-                <Text style={styles.retryText}>Retry</Text>
-              </TouchableOpacity>
-            </View>
-          ) : devices.length === 0 ? (
-            <View style={styles.emptyContainer}>
-              <Ionicons name="hardware-chip-outline" size={48} color="#9CA3AF" />
-              <Text style={styles.emptyText}>No devices found</Text>
-              <Text style={styles.emptySubtext}>Pull down to refresh</Text>
-            </View>
-          ) : (
-            devices.map((device, index) => (
-              <TouchableOpacity
-                key={device._id || device.deviceId || `device-${index}`}
-                onPress={() => handleDevicePress(device)}
-                activeOpacity={0.7}
-              >
-                <BlurView intensity={GLASS.intensity} tint={GLASS.tint} style={styles.deviceCard}>
-                  <View style={styles.deviceInfo}>
-                    <Text style={styles.deviceName}>{device.name || device.deviceId}</Text>
-                    <Text style={styles.deviceLocation}>{device.location || 'No location'}</Text>
+        <Animated.View entering={FadeIn.duration(200)} exiting={FadeOut.duration(150)} style={{ flex: 1 }}>
+          <ScrollView
+            style={styles.scrollView}
+            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#22C55E" />}
+            contentContainerStyle={styles.scrollContent}
+          >
+            <Text style={styles.sectionTitle}>Your Devices</Text>
+
+            {isLoading && devices.length === 0 ? (
+              <SkeletonDeviceCards />
+            ) : error ? (
+              <View style={styles.errorContainer}>
+                <Ionicons name="cloud-offline-outline" size={48} color="#6B7280" />
+                <Text style={styles.errorText}>{error}</Text>
+                <TouchableOpacity onPress={refetch} style={styles.retryButton} activeOpacity={0.7}>
+                  <Text style={styles.retryText}>Retry</Text>
+                </TouchableOpacity>
+              </View>
+            ) : devices.length === 0 ? (
+              <View style={styles.emptyContainer}>
+                <Ionicons name="hardware-chip-outline" size={64} color="#D1D5DB" />
+                <Text style={styles.emptyTitle}>No Devices Paired</Text>
+                <Text style={styles.emptySubtext}>Connect your grain dryer to get started</Text>
+                <TouchableOpacity
+                  style={styles.addDeviceButton}
+                  onPress={handleAddDevice}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons name="add-outline" size={20} color="#FFFFFF" />
+                  <Text style={styles.addDeviceButtonText}>Add Device</Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              devices.map((device, index) => (
+                <TouchableOpacity
+                  key={device._id || device.deviceId || `device-${index}`}
+                  onPress={() => handleDevicePress(device)}
+                  activeOpacity={0.7}
+                >
+                  <View style={styles.deviceCard}>
+                    <View style={styles.deviceInfo}>
+                      <Text style={styles.deviceName}>{device.name || device.deviceId}</Text>
+                      <Text style={styles.deviceLocation}>{device.location || 'No location'}</Text>
+                    </View>
+                    <StatusBadge status={device.status === 'online' ? 'online' : 'offline'} size="md" />
                   </View>
-                  <StatusBadge status={device.status === 'online' ? 'online' : 'offline'} size="md" />
-                </BlurView>
-              </TouchableOpacity>
-            ))
-          )}
-        </ScrollView>
+                </TouchableOpacity>
+              ))
+            )}
+          </ScrollView>
+        </Animated.View>
         <Navigation />
       </LinearGradient>
     </SafeAreaView>
@@ -103,14 +152,6 @@ const styles = StyleSheet.create({
   },
   gradient: {
     flex: 1,
-  },
-  loadingContainer: {
-    flex: 1,
-  },
-  loadingText: {
-    marginTop: 12,
-    color: 'rgba(0,0,0,0.5)',
-    ...IOS_TYPOGRAPHY.footnote,
   },
   scrollView: {
     flex: 1,
@@ -128,18 +169,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: GLASS.backgroundColor,
-    borderWidth: 1,
-    borderColor: GLASS.borderColor,
-    borderRadius: GLASS.borderRadius,
-    padding: 12,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 14,
     marginBottom: 8,
-    overflow: 'hidden',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: GLASS.shadowOpacity,
-    shadowRadius: GLASS.shadowRadius,
-    elevation: 5,
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 3,
   },
   deviceInfo: {
     flex: 1,
@@ -150,7 +188,7 @@ const styles = StyleSheet.create({
   },
   deviceLocation: {
     ...IOS_TYPOGRAPHY.footnote,
-    color: 'rgba(0,0,0,0.5)',
+    color: '#6B7280',
     marginTop: 2,
   },
   errorContainer: {
@@ -177,12 +215,65 @@ const styles = StyleSheet.create({
     paddingVertical: 48,
     gap: 8,
   },
-  emptyText: {
-    ...IOS_TYPOGRAPHY.headline,
-    color: 'rgba(0,0,0,0.5)',
+  emptyTitle: {
+    ...IOS_TYPOGRAPHY.title3,
+    fontWeight: '700',
+    color: '#374151',
+    marginTop: 8,
   },
   emptySubtext: {
     ...IOS_TYPOGRAPHY.footnote,
-    color: 'rgba(0,0,0,0.3)',
+    color: '#6B7280',
+    marginBottom: 16,
+  },
+  addDeviceButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#22C55E',
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 50,
+    shadowColor: '#22C55E',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 12,
+    elevation: 4,
+  },
+  addDeviceButtonText: {
+    ...IOS_TYPOGRAPHY.headline,
+    color: '#FFFFFF',
+  },
+  skeletonContainer: {
+    gap: 8,
+  },
+  skeletonCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 14,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  skeletonRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  skeletonTextBlock: {
+    flex: 1,
+  },
+  skeletonBar: {
+    height: 14,
+    backgroundColor: '#E5E7EB',
+    borderRadius: 6,
+  },
+  skeletonBadge: {
+    width: 64,
+    height: 24,
+    backgroundColor: '#E5E7EB',
+    borderRadius: 12,
   },
 });

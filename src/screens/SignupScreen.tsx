@@ -10,19 +10,17 @@ import {
   Alert,
   ActivityIndicator,
   Image,
-  StatusBar,
   ScrollView,
-  SafeAreaView,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { StatusBar } from 'expo-status-bar';
 import { LinearGradient } from 'expo-linear-gradient';
-import { BlurView } from 'expo-blur';
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/hooks';
 import { grainApi } from '@/api';
-import { GRADIENTS, GLASS, IOS_TYPOGRAPHY } from '@/utils/constants';
-
-const isValidEmail = (email: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+import { validateEmail } from '@/utils/validators';
+import { GRADIENTS, IOS_TYPOGRAPHY } from '@/utils/constants';
 
 export default function SignupScreen() {
   const { login } = useAuth();
@@ -34,9 +32,9 @@ export default function SignupScreen() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const emailRef = useRef<TextInput>(null);
-  const passwordRef = useRef<TextInput>(null);
-  const confirmRef = useRef<TextInput>(null);
+  const emailRef = useRef<any>(null);
+  const passwordRef = useRef<any>(null);
+  const confirmRef = useRef<any>(null);
 
   const handleSignup = async () => {
     setError(null);
@@ -49,7 +47,7 @@ export default function SignupScreen() {
       Alert.alert('Error', 'Please enter your email');
       return;
     }
-    if (!isValidEmail(email.trim())) {
+    if (!validateEmail(email.trim())) {
       Alert.alert('Error', 'Please enter a valid email address');
       return;
     }
@@ -69,8 +67,9 @@ export default function SignupScreen() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setIsLoading(true);
     try {
-      await grainApi.auth.register(name.trim(), email.trim(), password.trim());
+      const { user } = await grainApi.auth.register(name.trim(), email.trim(), password.trim());
       await login(email.trim(), password.trim());
+      router.replace('/(app)');
     } catch (err: any) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       const message = err?.message || 'Registration failed. Please try again.';
@@ -82,12 +81,12 @@ export default function SignupScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="dark-content" />
+    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+      <StatusBar style="dark" />
       <LinearGradient colors={GRADIENTS.login} style={styles.gradient}>
         <KeyboardAvoidingView
           style={styles.keyboardView}
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         >
           <ScrollView
             contentContainerStyle={styles.scrollContent}
@@ -107,7 +106,7 @@ export default function SignupScreen() {
               <Text style={styles.appTagline}>IoT Grain Dryer System</Text>
             </View>
 
-            <BlurView intensity={GLASS.intensity} tint={GLASS.tint} style={styles.glassCard}>
+            <View style={styles.card}>
               <Text style={styles.cardTitle}>Create Your Account</Text>
 
               <View style={styles.inputContainer}>
@@ -205,7 +204,7 @@ export default function SignupScreen() {
                   Already have an account? <Text style={styles.signInLinkBold}>Sign In</Text>
                 </Text>
               </TouchableOpacity>
-            </BlurView>
+            </View>
           </ScrollView>
         </KeyboardAvoidingView>
       </LinearGradient>
@@ -262,21 +261,19 @@ const styles = StyleSheet.create({
   },
   appTagline: {
     ...IOS_TYPOGRAPHY.footnote,
-    color: 'rgba(0,0,0,0.5)',
+    color: '#6B7280',
     marginTop: 4,
   },
-  glassCard: {
-    backgroundColor: GLASS.backgroundColor,
-    borderWidth: 1,
-    borderColor: GLASS.borderColor,
-    borderRadius: GLASS.borderRadius,
+  card: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
     padding: 24,
     overflow: 'hidden',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: GLASS.shadowOpacity,
-    shadowRadius: GLASS.shadowRadius,
-    elevation: 5,
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 3,
   },
   cardTitle: {
     ...IOS_TYPOGRAPHY.title2,
@@ -294,9 +291,9 @@ const styles = StyleSheet.create({
     color: '#111111',
   },
   input: {
-    backgroundColor: 'rgba(255,255,255,0.6)',
+    backgroundColor: '#F9FAFB',
     borderWidth: 1,
-    borderColor: 'rgba(0,0,0,0.08)',
+    borderColor: '#E5E7EB',
     borderRadius: 12,
     paddingHorizontal: 16,
     paddingVertical: 14,
@@ -336,7 +333,7 @@ const styles = StyleSheet.create({
   },
   signInLinkText: {
     ...IOS_TYPOGRAPHY.footnote,
-    color: 'rgba(0,0,0,0.5)',
+    color: '#6B7280',
   },
   signInLinkBold: {
     color: '#22C55E',

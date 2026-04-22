@@ -6,16 +6,17 @@ import {
   TouchableOpacity,
   StyleSheet,
   Alert,
-  StatusBar,
-  SafeAreaView,
+  ActivityIndicator,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { StatusBar } from 'expo-status-bar';
 import { LinearGradient } from 'expo-linear-gradient';
-import { BlurView } from 'expo-blur';
 import * as Haptics from 'expo-haptics';
 import { Ionicons } from '@expo/vector-icons';
+import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import { Header, Navigation, ModeToggle, CustomSlider, StatusBadge } from '@/components';
 import { grainApi } from '@/api';
-import { GRADIENTS, GLASS, IOS_TYPOGRAPHY } from '@/utils/constants';
+import { GRADIENTS, IOS_TYPOGRAPHY } from '@/utils/constants';
 
 export default function ControlScreen() {
   const [mode, setMode] = useState<'auto' | 'manual'>('auto');
@@ -60,10 +61,11 @@ export default function ControlScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="dark-content" />
+    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+      <StatusBar style="dark" />
       <LinearGradient colors={GRADIENTS.control} style={styles.gradient}>
         <Header />
+        <Animated.View entering={FadeIn.duration(200)} exiting={FadeOut.duration(150)} style={{ flex: 1 }}>
         <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
           <View style={styles.titleRow}>
             <View>
@@ -73,29 +75,47 @@ export default function ControlScreen() {
             <StatusBadge status={isRunning ? 'running' : 'idle'} size="md" />
           </View>
 
-          <BlurView intensity={GLASS.intensity} tint={GLASS.tint} style={styles.glassCard}>
+          <View style={styles.card}>
             <Text style={styles.cardLabel}>SYSTEM STATUS</Text>
             <View style={styles.statusRow}>
               <Ionicons name="ellipse" size={12} color="#22C55E" />
               <Text style={styles.statusTextGreen}>Running</Text>
             </View>
 
-            <TouchableOpacity
-              style={styles.stopButton}
-              onPress={handleStopDryer}
-              disabled={isControlling || !isRunning}
-              activeOpacity={0.7}
-            >
-              <Ionicons name="stop" size={20} color="#FFFFFF" />
-              <Text style={styles.stopButtonText}>Stop Dryer</Text>
-            </TouchableOpacity>
+            {isRunning ? (
+              <TouchableOpacity
+                style={styles.stopButton}
+                onPress={handleStopDryer}
+                disabled={isControlling}
+                activeOpacity={0.7}
+              >
+                <Ionicons name="stop" size={20} color="#FFFFFF" />
+                <Text style={styles.stopButtonText}>Stop Dryer</Text>
+              </TouchableOpacity>
+            ) : (
+              <TouchableOpacity
+                style={styles.startButton}
+                onPress={handleStartDryer}
+                disabled={isControlling}
+                activeOpacity={0.7}
+              >
+                {isControlling ? (
+                  <ActivityIndicator color="#FFFFFF" />
+                ) : (
+                  <>
+                    <Ionicons name="play" size={20} color="#FFFFFF" />
+                    <Text style={styles.startButtonText}>Start Dryer</Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            )}
 
             <Text style={[styles.cardLabel, { marginTop: 24 }]}>OPERATING MODE</Text>
             <ModeToggle mode={mode} onModeChange={(m: string) => setMode(m as 'auto' | 'manual')} />
-          </BlurView>
+          </View>
 
           {mode === 'manual' && (
-            <BlurView intensity={GLASS.intensity} tint={GLASS.tint} style={styles.glassCard}>
+            <View style={styles.card}>
               <Text style={styles.cardLabel}>ADVANCED SETTINGS</Text>
               <View style={styles.sliderSection}>
                 <View style={styles.sliderHeader}>
@@ -128,10 +148,10 @@ export default function ControlScreen() {
                   onValueChange={setFanSpeed}
                 />
               </View>
-            </BlurView>
+            </View>
           )}
 
-          <BlurView intensity={GLASS.intensity} tint={GLASS.tint} style={styles.glassCard}>
+          <View style={styles.card}>
             <Text style={styles.cardLabel}>QUICK PRESETS</Text>
             <View style={styles.presetsRow}>
               <TouchableOpacity
@@ -151,8 +171,9 @@ export default function ControlScreen() {
                 <Text style={styles.presetMediumText}>Medium Speed</Text>
               </TouchableOpacity>
             </View>
-          </BlurView>
+          </View>
         </ScrollView>
+        </Animated.View>
         <Navigation />
       </LinearGradient>
     </SafeAreaView>
@@ -185,26 +206,24 @@ const styles = StyleSheet.create({
   },
   screenSubtitle: {
     ...IOS_TYPOGRAPHY.footnote,
-    color: 'rgba(0,0,0,0.5)',
+    color: '#6B7280',
     marginTop: 2,
   },
-  glassCard: {
-    backgroundColor: GLASS.backgroundColor,
-    borderWidth: 1,
-    borderColor: GLASS.borderColor,
-    borderRadius: GLASS.borderRadius,
-    padding: 12,
+  card: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 16,
     overflow: 'hidden',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: GLASS.shadowOpacity,
-    shadowRadius: GLASS.shadowRadius,
-    elevation: 5,
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 3,
   },
   cardLabel: {
     ...IOS_TYPOGRAPHY.caption2,
     fontWeight: '600',
-    color: 'rgba(0,0,0,0.5)',
+    color: '#6B7280',
     textTransform: 'uppercase',
     letterSpacing: 0.5,
     marginBottom: 12,
@@ -234,6 +253,24 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
   stopButtonText: {
+    color: '#FFFFFF',
+    ...IOS_TYPOGRAPHY.headline,
+  },
+  startButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: '#22C55E',
+    borderRadius: 50,
+    paddingVertical: 12,
+    shadowColor: '#22C55E',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  startButtonText: {
     color: '#FFFFFF',
     ...IOS_TYPOGRAPHY.headline,
   },

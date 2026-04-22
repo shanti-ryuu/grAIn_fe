@@ -10,17 +10,16 @@ import {
   Alert,
   ActivityIndicator,
   Image,
-  StatusBar,
-  SafeAreaView,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { StatusBar } from 'expo-status-bar';
 import { LinearGradient } from 'expo-linear-gradient';
-import { BlurView } from 'expo-blur';
 import * as Haptics from 'expo-haptics';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '@/hooks';
 import { grainApi } from '@/api';
 import { useRouter } from 'expo-router';
-import { GRADIENTS, GLASS, IOS_TYPOGRAPHY } from '@/utils/constants';
+import { GRADIENTS, IOS_TYPOGRAPHY } from '@/utils/constants';
 
 const isValidEmail = (email: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 
@@ -30,8 +29,8 @@ export default function LoginScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [serverStatus, setServerStatus] = useState<'checking' | 'online' | 'offline'>('checking');
-  const emailRef = useRef<TextInput>(null);
-  const passwordRef = useRef<TextInput>(null);
+  const emailRef = useRef<any>(null);
+  const passwordRef = useRef<any>(null);
 
   useEffect(() => {
     checkServerHealth();
@@ -85,12 +84,12 @@ export default function LoginScreen() {
   const serverStatusText = serverStatus === 'checking' ? 'Checking...' : serverStatus === 'online' ? 'Online' : 'Offline';
 
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="dark-content" />
+    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+      <StatusBar style="dark" />
       <LinearGradient colors={GRADIENTS.login} style={styles.gradient}>
         <KeyboardAvoidingView
           style={styles.keyboardView}
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         >
           <View style={styles.content}>
             <View style={styles.logoSection}>
@@ -107,7 +106,7 @@ export default function LoginScreen() {
               <Text style={styles.appTagline}>IoT Grain Dryer System</Text>
             </View>
 
-            <BlurView intensity={GLASS.intensity} tint={GLASS.tint} style={styles.glassCard}>
+            <View style={styles.card}>
               <Text style={styles.cardTitle}>Login to Your Account</Text>
 
               <View style={styles.inputContainer}>
@@ -177,7 +176,7 @@ export default function LoginScreen() {
               >
                 <Text style={styles.createAccountButtonText}>Create an Account</Text>
               </TouchableOpacity>
-            </BlurView>
+            </View>
 
             <TouchableOpacity
               style={styles.demoRow}
@@ -248,21 +247,19 @@ const styles = StyleSheet.create({
   },
   appTagline: {
     ...IOS_TYPOGRAPHY.footnote,
-    color: 'rgba(0,0,0,0.5)',
+    color: '#6B7280',
     marginTop: 4,
   },
-  glassCard: {
-    backgroundColor: GLASS.backgroundColor,
-    borderWidth: 1,
-    borderColor: GLASS.borderColor,
-    borderRadius: GLASS.borderRadius,
+  card: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
     padding: 24,
     overflow: 'hidden',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: GLASS.shadowOpacity,
-    shadowRadius: GLASS.shadowRadius,
-    elevation: 5,
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 3,
   },
   cardTitle: {
     ...IOS_TYPOGRAPHY.title2,
@@ -280,9 +277,9 @@ const styles = StyleSheet.create({
     color: '#111111',
   },
   input: {
-    backgroundColor: 'rgba(255,255,255,0.6)',
+    backgroundColor: '#F9FAFB',
     borderWidth: 1,
-    borderColor: 'rgba(0,0,0,0.08)',
+    borderColor: '#E5E7EB',
     borderRadius: 12,
     paddingHorizontal: 16,
     paddingVertical: 14,
@@ -324,11 +321,11 @@ const styles = StyleSheet.create({
   dividerLine: {
     flex: 1,
     height: 1,
-    backgroundColor: 'rgba(0,0,0,0.08)',
+    backgroundColor: '#E5E7EB',
   },
   dividerText: {
     ...IOS_TYPOGRAPHY.footnote,
-    color: 'rgba(0,0,0,0.4)',
+    color: '#9CA3AF',
   },
   createAccountButton: {
     backgroundColor: 'transparent',
@@ -367,6 +364,6 @@ const styles = StyleSheet.create({
   },
   serverText: {
     ...IOS_TYPOGRAPHY.caption1,
-    color: 'rgba(0,0,0,0.4)',
+    color: '#9CA3AF',
   },
 });

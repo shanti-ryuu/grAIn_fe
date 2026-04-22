@@ -7,18 +7,18 @@ import {
   StyleSheet,
   ActivityIndicator,
   Alert,
-  StatusBar,
-  SafeAreaView,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { StatusBar } from 'expo-status-bar';
 import { LinearGradient } from 'expo-linear-gradient';
-import { BlurView } from 'expo-blur';
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { useDevice, useSensorData } from '@/hooks';
+import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
+import { useDevice, useRealtimeSensor } from '@/hooks';
 import { StatusBadge, Header, Navigation, DryingSimulation, ProgressBar } from '@/components';
 import { grainApi } from '@/api';
-import { GRADIENTS, GLASS, IOS_TYPOGRAPHY } from '@/utils/constants';
+import { GRADIENTS, IOS_TYPOGRAPHY } from '@/utils/constants';
 
 interface DeviceDetailScreenProps {
   deviceId?: string;
@@ -34,7 +34,7 @@ function getGreeting(): string {
 export default function DeviceDetailScreen({ deviceId }: DeviceDetailScreenProps) {
   const router = useRouter();
   const { device, isLoading: deviceLoading, error: deviceError } = useDevice(deviceId);
-  const { latestData, sensorData, isLoading: sensorLoading, error: sensorError } = useSensorData(deviceId);
+  const { sensorData: realtimeData, isOnline: realtimeOnline, lastUpdated } = useRealtimeSensor(device?.deviceId);
   const [isControlling, setIsControlling] = useState(false);
 
   const handleStartDryer = async () => {
@@ -65,19 +65,19 @@ export default function DeviceDetailScreen({ deviceId }: DeviceDetailScreenProps
 
   if (deviceLoading) {
     return (
-      <View style={styles.loadingContainer}>
-        <StatusBar barStyle="dark-content" />
+      <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+        <StatusBar style="dark" />
         <LinearGradient colors={GRADIENTS.dashboard} style={styles.gradient}>
           <ActivityIndicator size="large" color="#22C55E" />
         </LinearGradient>
-      </View>
+      </SafeAreaView>
     );
   }
 
   if (deviceError || !device) {
     return (
-      <View style={styles.loadingContainer}>
-        <StatusBar barStyle="dark-content" />
+      <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+        <StatusBar style="dark" />
         <LinearGradient colors={GRADIENTS.dashboard} style={styles.gradient}>
           <Ionicons name="alert-circle-outline" size={48} color="#EF4444" />
           <Text style={styles.errorText}>{deviceError || 'Device not found'}</Text>
@@ -85,87 +85,111 @@ export default function DeviceDetailScreen({ deviceId }: DeviceDetailScreenProps
             <Text style={styles.backButtonText}>Go Back</Text>
           </TouchableOpacity>
         </LinearGradient>
-      </View>
+      </SafeAreaView>
     );
   }
 
-  const moisture = latestData?.moisture ?? 18.5;
-  const temperature = latestData?.temperature ?? 65.5;
-  const humidity = latestData?.humidity ?? 42.3;
-  const energy = latestData?.energy ?? 2.4;
-  const fanSpeed = latestData?.fanSpeed ?? 75;
-  const isOnline = device.status === 'online';
+  const moisture = realtimeData?.moisture ?? 18.5;
+  const temperature = realtimeData?.temperature ?? 65.5;
+  const humidity = realtimeData?.humidity ?? 42.3;
+  const energy = realtimeData?.energy ?? 2.4;
+  const fanSpeed = realtimeData?.fanSpeed ?? 75;
+  const status = realtimeData?.status ?? 'idle';
+  const isOnline = realtimeOnline || device.status === 'online';
 
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="dark-content" />
+    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+      <StatusBar style="dark" />
       <LinearGradient colors={GRADIENTS.dashboard} style={styles.gradient}>
         <Header />
+        <Animated.View entering={FadeIn.duration(200)} exiting={FadeOut.duration(150)} style={{ flex: 1 }}>
         <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
           <View style={styles.greetingRow}>
             <View style={styles.greetingText}>
               <Text style={styles.greeting}>{getGreeting()}, Farmer</Text>
               <Text style={styles.greetingSub}>Monitor your grain dryer</Text>
             </View>
-            <StatusBadge status={isOnline ? 'running' : 'offline'} size="md" />
+            <View style={styles.statusRow}>
+              <StatusBadge status={isOnline ? 'running' : 'offline'} size="md" />
+              {isOnline && (
+                <View style={styles.liveBadge}>
+                  <View style={styles.liveDot} />
+                  <Text style={styles.liveText}>LIVE</Text>
+                </View>
+              )}
+            </View>
           </View>
 
           <DryingSimulation moistureLevel={moisture} isDrying={isOnline} />
 
-          <BlurView intensity={GLASS.intensity} tint={GLASS.tint} style={styles.glassCard}>
+          <View style={styles.card}>
             <ProgressBar
               progress={45}
               timeRemaining="2h 30m"
               showLabel={true}
               showTime={true}
             />
-          </BlurView>
+          </View>
 
           <View style={styles.sensorGrid}>
-            <BlurView intensity={GLASS.intensity} tint={GLASS.tint} style={styles.sensorCard}>
+            <View style={styles.sensorCard}>
               <View style={[styles.sensorIconBg, { backgroundColor: 'rgba(249,115,22,0.1)' }]}>
                 <Ionicons name="thermometer-outline" size={22} color="#F97316" />
               </View>
               <Text style={[styles.sensorValue, { color: '#F97316' }]}>{temperature} °C</Text>
               <Text style={styles.sensorLabel}>TEMPERATURE</Text>
-            </BlurView>
-            <BlurView intensity={GLASS.intensity} tint={GLASS.tint} style={styles.sensorCard}>
+            </View>
+            <View style={styles.sensorCard}>
               <View style={[styles.sensorIconBg, { backgroundColor: 'rgba(34,197,94,0.1)' }]}>
                 <Ionicons name="water-outline" size={22} color="#22C55E" />
               </View>
               <Text style={[styles.sensorValue, { color: '#22C55E' }]}>{humidity} %</Text>
               <Text style={styles.sensorLabel}>HUMIDITY</Text>
-            </BlurView>
-            <BlurView intensity={GLASS.intensity} tint={GLASS.tint} style={styles.sensorCard}>
+            </View>
+            <View style={styles.sensorCard}>
               <View style={[styles.sensorIconBg, { backgroundColor: 'rgba(34,197,94,0.1)' }]}>
                 <Ionicons name="analytics-outline" size={22} color="#22C55E" />
               </View>
               <Text style={[styles.sensorValue, { color: '#22C55E' }]}>{moisture} %</Text>
               <Text style={styles.sensorLabel}>MOISTURE</Text>
-            </BlurView>
-            <BlurView intensity={GLASS.intensity} tint={GLASS.tint} style={styles.sensorCard}>
+            </View>
+            <View style={styles.sensorCard}>
               <View style={[styles.sensorIconBg, { backgroundColor: 'rgba(34,197,94,0.1)' }]}>
                 <Ionicons name="flash-outline" size={22} color="#22C55E" />
               </View>
               <Text style={[styles.sensorValue, { color: '#22C55E' }]}>{energy} kWh</Text>
               <Text style={styles.sensorLabel}>ENERGY</Text>
-            </BlurView>
+            </View>
+            <View style={styles.sensorCard}>
+              <View style={[styles.sensorIconBg, { backgroundColor: 'rgba(249,115,22,0.1)' }]}>
+                <Ionicons name="speedometer-outline" size={22} color="#F97316" />
+              </View>
+              <Text style={[styles.sensorValue, { color: '#F97316' }]}>{fanSpeed} %</Text>
+              <Text style={styles.sensorLabel}>FAN SPEED</Text>
+            </View>
+            <View style={styles.sensorCard}>
+              <View style={[styles.sensorIconBg, { backgroundColor: 'rgba(59,130,246,0.1)' }]}>
+                <Ionicons name="pulse-outline" size={22} color="#3B82F6" />
+              </View>
+              <Text style={[styles.sensorValue, { color: '#3B82F6' }]}>{status.toUpperCase()}</Text>
+              <Text style={styles.sensorLabel}>STATUS</Text>
+            </View>
           </View>
 
           <View style={styles.rowCards}>
-            <BlurView intensity={GLASS.intensity} tint={GLASS.tint} style={styles.halfCard}>
+            <View style={styles.halfCard}>
               <Text style={styles.cardLabel}>STATUS</Text>
               <Text style={styles.cardValueGreen}>Running</Text>
               <Text style={styles.cardSub}>Fan Speed: {fanSpeed} %</Text>
-            </BlurView>
-            <BlurView intensity={GLASS.intensity} tint={GLASS.tint} style={styles.halfCard}>
+            </View>
+            <View style={styles.halfCard}>
               <Text style={styles.cardLabel}>DURATION</Text>
               <Text style={styles.cardValue}>3.5 hrs</Text>
               <Text style={styles.cardSub}>Time Running: 1h 45m</Text>
-            </BlurView>
+            </View>
           </View>
 
-          <BlurView intensity={GLASS.intensity} tint={GLASS.tint} style={styles.bottomBanner}>
+          <View style={styles.bottomBanner}>
             <View style={styles.bannerLeft}>
               <View style={styles.bannerDot} />
               <Text style={styles.bannerText}>System Running</Text>
@@ -177,8 +201,9 @@ export default function DeviceDetailScreen({ deviceId }: DeviceDetailScreenProps
             >
               <Text style={styles.controlButtonText}>Control</Text>
             </TouchableOpacity>
-          </BlurView>
+          </View>
         </ScrollView>
+        </Animated.View>
         <Navigation />
       </LinearGradient>
     </SafeAreaView>
@@ -232,21 +257,44 @@ const styles = StyleSheet.create({
   },
   greetingSub: {
     ...IOS_TYPOGRAPHY.footnote,
-    color: 'rgba(0,0,0,0.5)',
+    color: '#6B7280',
     marginTop: 2,
   },
-  glassCard: {
-    backgroundColor: GLASS.backgroundColor,
-    borderWidth: 1,
-    borderColor: GLASS.borderColor,
-    borderRadius: GLASS.borderRadius,
-    padding: 12,
+  statusRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  liveBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#DCFCE7',
+    borderRadius: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  liveDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#22C55E',
+    marginRight: 4,
+  },
+  liveText: {
+    fontSize: 11,
+    color: '#16A34A',
+    fontWeight: '700',
+  },
+  card: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 16,
     overflow: 'hidden',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: GLASS.shadowOpacity,
-    shadowRadius: GLASS.shadowRadius,
-    elevation: 5,
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 3,
   },
   sensorGrid: {
     flexDirection: 'row',
@@ -256,19 +304,16 @@ const styles = StyleSheet.create({
   sensorCard: {
     flex: 1,
     minWidth: '45%',
-    backgroundColor: GLASS.backgroundColor,
-    borderWidth: 1,
-    borderColor: GLASS.borderColor,
-    borderRadius: GLASS.borderRadius,
-    padding: 10,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 12,
     alignItems: 'center',
     gap: 4,
-    overflow: 'hidden',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: GLASS.shadowOpacity,
-    shadowRadius: GLASS.shadowRadius,
-    elevation: 5,
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 3,
   },
   sensorIconBg: {
     width: 36,
@@ -283,7 +328,7 @@ const styles = StyleSheet.create({
   sensorLabel: {
     ...IOS_TYPOGRAPHY.caption2,
     fontWeight: '600',
-    color: 'rgba(0,0,0,0.5)',
+    color: '#6B7280',
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
@@ -293,22 +338,20 @@ const styles = StyleSheet.create({
   },
   halfCard: {
     flex: 1,
-    backgroundColor: GLASS.backgroundColor,
-    borderWidth: 1,
-    borderColor: GLASS.borderColor,
-    borderRadius: GLASS.borderRadius,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
     padding: 12,
     overflow: 'hidden',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: GLASS.shadowOpacity,
-    shadowRadius: GLASS.shadowRadius,
-    elevation: 5,
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 3,
   },
   cardLabel: {
     ...IOS_TYPOGRAPHY.caption2,
     fontWeight: '600',
-    color: 'rgba(0,0,0,0.5)',
+    color: '#6B7280',
     textTransform: 'uppercase',
     letterSpacing: 0.5,
     marginBottom: 4,
@@ -325,23 +368,21 @@ const styles = StyleSheet.create({
   },
   cardSub: {
     ...IOS_TYPOGRAPHY.footnote,
-    color: 'rgba(0,0,0,0.5)',
+    color: '#6B7280',
   },
   bottomBanner: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: GLASS.backgroundColor,
-    borderWidth: 1,
-    borderColor: GLASS.borderColor,
-    borderRadius: GLASS.borderRadius,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
     padding: 12,
     overflow: 'hidden',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: GLASS.shadowOpacity,
-    shadowRadius: GLASS.shadowRadius,
-    elevation: 5,
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 3,
   },
   bannerLeft: {
     flexDirection: 'row',

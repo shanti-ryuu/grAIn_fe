@@ -9,9 +9,9 @@ interface StatusBadgeProps {
 
 const STATUS_CONFIG: Record<string, { color: string; bg: string; label: string }> = {
   online: { color: '#16A34A', bg: '#DCFCE7', label: 'Online' },
-  offline: { color: '#6B7280', bg: '#F3F4F6', label: 'Offline' },
-  running: { color: '#16A34A', bg: '#DCFCE7', label: 'Running' },
-  idle: { color: '#D97706', bg: '#FEF3C7', label: 'Idle' },
+  offline: { color: '#9CA3AF', bg: '#F3F4F6', label: 'Offline' },
+  running: { color: '#CA8A04', bg: '#FEF9C3', label: 'Running' },
+  idle: { color: '#CA8A04', bg: '#FEF9C3', label: 'Idle' },
   error: { color: '#DC2626', bg: '#FEE2E2', label: 'Error' },
   paused: { color: '#2563EB', bg: '#DBEAFE', label: 'Paused' },
   active: { color: '#16A34A', bg: '#DCFCE7', label: 'Active' },

@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * grAIn Mobile App - API Client Library
  * Backend endpoints matching the grAIn IoT Grain Dryer API
@@ -32,9 +31,20 @@ export interface SensorData {
   temperature: number
   humidity: number
   moisture: number
-  energy: number
   fanSpeed: number
+  energy: number
+  status: string
   timestamp: string
+}
+
+export interface AlertItem {
+  _id: string
+  deviceId?: string
+  severity: 'info' | 'warning' | 'error' | 'success'
+  title: string
+  message: string
+  timestamp: string
+  acknowledged?: boolean
 }
 
 export interface Command {
@@ -164,35 +174,23 @@ class GrainApiClient {
         '/auth/login',
         { email, password }
       )
-      const payload = response.data.data || response.data
-      if (payload) {
-        const token = payload.token
-        const user = payload.user
-        if (token) {
-          await this.setStoredToken(token)
-        }
-        if (user) {
-          return { token, user }
-        }
+      const payload = (response.data.data || response.data) as { token: string; user: User } | undefined
+      if (payload?.token && payload?.user) {
+        await this.setStoredToken(payload.token)
+        return { token: payload.token, user: payload.user }
       }
       throw new Error('Invalid login response')
     },
 
-    register: async (name: string, email: string, password: string): Promise<{ token: string; user: User }> => {
+    register: async (name: string, email: string, password: string, role: string = 'farmer'): Promise<{ token: string; user: User }> => {
       const response = await this.client.post<ApiResponse<{ token: string; user: User }>>(
         '/auth/register',
-        { name, email, password, role: 'farmer' }
+        { name, email, password, role }
       )
-      const payload = response.data.data || response.data
-      if (payload) {
-        const token = payload.token
-        const user = payload.user
-        if (token) {
-          await this.setStoredToken(token)
-        }
-        if (user) {
-          return { token, user }
-        }
+      const payload = (response.data.data || response.data) as { token: string; user: User } | undefined
+      if (payload?.token && payload?.user) {
+        await this.setStoredToken(payload.token)
+        return { token: payload.token, user: payload.user }
       }
       throw new Error('Invalid register response')
     },
@@ -241,6 +239,17 @@ class GrainApiClient {
         return (response.data.data as any).device ?? response.data.data as any
       }
       throw new Error('Invalid device response')
+    },
+
+    register: async (deviceId: string, location: string): Promise<Device> => {
+      const response = await this.client.post<ApiResponse<Device>>('/devices', {
+        deviceId,
+        location,
+      })
+      if (response.data.data) {
+        return response.data.data
+      }
+      throw new Error('Invalid device register response')
     },
   }
 
@@ -324,6 +333,23 @@ class GrainApiClient {
         return Array.isArray(response.data.data) ? response.data.data : []
       }
       throw new Error('Invalid commands response')
+    },
+  }
+
+  // ─── Alerts ───────────────────────────────────────────────
+
+  alerts = {
+    getAll: async (): Promise<AlertItem[]> => {
+      const response = await this.client.get<ApiResponse<AlertItem[]>>('/alerts')
+      const data = response.data.data || response.data
+      if (Array.isArray(data)) {
+        return data
+      }
+      throw new Error('Invalid alerts response')
+    },
+
+    clear: async (): Promise<void> => {
+      await this.client.delete('/alerts')
     },
   }
 

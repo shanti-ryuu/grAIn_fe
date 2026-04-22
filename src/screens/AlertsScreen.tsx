@@ -8,18 +8,19 @@ import {
   Switch,
   StyleSheet,
   ActivityIndicator,
-  StatusBar,
-  SafeAreaView,
+  Alert,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { StatusBar } from 'expo-status-bar';
 import { LinearGradient } from 'expo-linear-gradient';
-import { BlurView } from 'expo-blur';
 import * as Haptics from 'expo-haptics';
 import { Ionicons } from '@expo/vector-icons';
+import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import { Header, Navigation, AlertCard } from '@/components';
 import { grainApi } from '@/api';
-import { GRADIENTS, GLASS, IOS_TYPOGRAPHY } from '@/utils/constants';
+import { GRADIENTS, IOS_TYPOGRAPHY } from '@/utils/constants';
 
-interface AlertItem {
+interface AlertEntry {
   id: string | number;
   severity: 'success' | 'info' | 'warning' | 'error';
   title: string;
@@ -37,7 +38,7 @@ const FILTER_CONFIG: { key: FilterType; label: string; color: string; activeBg: 
 ];
 
 export default function AlertsScreen() {
-  const [alerts, setAlerts] = useState<AlertItem[]>([]);
+  const [alerts, setAlerts] = useState<AlertEntry[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [filter, setFilter] = useState<FilterType>('all');
   const [refreshing, setRefreshing] = useState(false);
@@ -47,9 +48,16 @@ export default function AlertsScreen() {
 
   const fetchAlerts = useCallback(async () => {
     try {
-      await grainApi.sensors.getData('alerts', { limit: 50 });
-      setAlerts([]);
-    } catch {
+      const data = await grainApi.alerts.getAll();
+      setAlerts(data.map((a) => ({
+        id: a._id,
+        severity: a.severity,
+        title: a.title,
+        message: a.message,
+        timestamp: a.timestamp,
+      })));
+    } catch (err: any) {
+      Alert.alert('Error', err?.message || 'Failed to fetch alerts');
       setAlerts([]);
     } finally {
       setIsLoading(false);
@@ -70,18 +78,24 @@ export default function AlertsScreen() {
     setAlerts((prev) => prev.filter((a) => a.id !== id));
   };
 
-  const handleClearAll = () => {
+  const handleClearAll = async () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    setAlerts([]);
+    try {
+      await grainApi.alerts.clear();
+      setAlerts([]);
+    } catch (err: any) {
+      Alert.alert('Error', err?.message || 'Failed to clear alerts');
+    }
   };
 
   const filteredAlerts = filter === 'all' ? alerts : alerts.filter((a) => a.severity === filter);
 
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="dark-content" />
+    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+      <StatusBar style="dark" />
       <LinearGradient colors={GRADIENTS.alerts} style={styles.gradient}>
         <Header />
+        <Animated.View entering={FadeIn.duration(200)} exiting={FadeOut.duration(150)} style={{ flex: 1 }}>
         <ScrollView
           style={styles.scrollView}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#22C55E" />}
@@ -123,12 +137,12 @@ export default function AlertsScreen() {
               <Text style={styles.emptySubtext}>You're all caught up!</Text>
             </View>
           ) : (
-            filteredAlerts.map((alert) => (
+            filteredAlerts.map((alert: any) => (
               <AlertCard key={alert.id} alert={alert} onDismiss={handleDismiss} />
             ))
           )}
 
-          <BlurView intensity={GLASS.intensity} tint={GLASS.tint} style={styles.glassCard}>
+          <View style={styles.card}>
             <Text style={styles.settingsTitle}>Alert Settings</Text>
 
             <View style={styles.settingRow}>
@@ -169,8 +183,9 @@ export default function AlertsScreen() {
                 thumbColor="#FFFFFF"
               />
             </View>
-          </BlurView>
+          </View>
         </ScrollView>
+        </Animated.View>
         <Navigation />
       </LinearGradient>
     </SafeAreaView>
@@ -203,7 +218,8 @@ const styles = StyleSheet.create({
   },
   alertCount: {
     ...IOS_TYPOGRAPHY.footnote,
-    color: 'rgba(0,0,0,0.5)',
+    color: '#6B7280',
+    textTransform: 'uppercase',
     marginTop: 2,
   },
   clearAllButton: {
@@ -212,7 +228,7 @@ const styles = StyleSheet.create({
     borderRadius: 50,
     borderWidth: 1.5,
     borderColor: '#22C55E',
-    backgroundColor: 'rgba(255,255,255,0.6)',
+    backgroundColor: '#FFFFFF',
   },
   clearAllText: {
     ...IOS_TYPOGRAPHY.footnote,
@@ -227,12 +243,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 50,
-    backgroundColor: 'rgba(0,0,0,0.05)',
+    backgroundColor: '#F3F4F6',
   },
   filterText: {
     ...IOS_TYPOGRAPHY.footnote,
     fontWeight: '600',
-    color: 'rgba(0,0,0,0.5)',
+    color: '#6B7280',
   },
   filterActiveText: {
     color: '#FFFFFF',
@@ -252,20 +268,18 @@ const styles = StyleSheet.create({
   },
   emptySubtext: {
     ...IOS_TYPOGRAPHY.footnote,
-    color: 'rgba(0,0,0,0.5)',
+    color: '#6B7280',
   },
-  glassCard: {
-    backgroundColor: GLASS.backgroundColor,
-    borderWidth: 1,
-    borderColor: GLASS.borderColor,
-    borderRadius: GLASS.borderRadius,
-    padding: 12,
+  card: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 16,
     overflow: 'hidden',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: GLASS.shadowOpacity,
-    shadowRadius: GLASS.shadowRadius,
-    elevation: 5,
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 3,
   },
   settingsTitle: {
     ...IOS_TYPOGRAPHY.headline,
@@ -278,7 +292,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(0,0,0,0.05)',
+    borderBottomColor: '#E5E7EB',
   },
   settingInfo: {
     flex: 1,
@@ -290,7 +304,7 @@ const styles = StyleSheet.create({
   },
   settingDesc: {
     ...IOS_TYPOGRAPHY.footnote,
-    color: 'rgba(0,0,0,0.5)',
+    color: '#6B7280',
     marginTop: 2,
   },
 });

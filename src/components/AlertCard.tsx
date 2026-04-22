@@ -15,6 +15,7 @@ interface AlertData {
 interface AlertCardProps {
   alert: AlertData;
   onDismiss?: (id: string | number) => void;
+  key?: string | number;
 }
 
 const SEVERITY_CONFIG: Record<string, { bg: string; border: string; text: string; icon: IoniconName; label: string }> = {

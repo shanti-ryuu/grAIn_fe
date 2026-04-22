@@ -1,10 +1,10 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
-import { BlurView } from 'expo-blur';
 import * as Haptics from 'expo-haptics';
 import { useRouter, usePathname } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { GLASS, IOS_TYPOGRAPHY } from '@/utils/constants';
+import Animated, { useSharedValue, useAnimatedStyle, withSpring } from 'react-native-reanimated';
+import { IOS_TYPOGRAPHY } from '@/utils/constants';
 
 type IoniconName = React.ComponentProps<typeof Ionicons>['name'];
 
@@ -25,7 +25,35 @@ const TABS: TabConfig[] = [
 ];
 
 const ACTIVE_COLOR = '#22C55E';
-const INACTIVE_COLOR = 'rgba(0,0,0,0.3)';
+const INACTIVE_COLOR = '#9CA3AF';
+
+interface AnimatedIconProps {
+  name: IoniconName;
+  color: string;
+  focused: boolean;
+}
+
+function AnimatedIcon({ name, color, focused }: AnimatedIconProps) {
+  const scale = useSharedValue(1);
+
+  useEffect(() => {
+    if (focused) {
+      scale.value = withSpring(1.2, { damping: 10 });
+    } else {
+      scale.value = withSpring(1, { damping: 12 });
+    }
+  }, [focused]);
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: scale.value }],
+  }));
+
+  return (
+    <Animated.View style={animatedStyle}>
+      <Ionicons name={name} size={24} color={color} />
+    </Animated.View>
+  );
+}
 
 export default function Navigation() {
   const router = useRouter();
@@ -37,7 +65,7 @@ export default function Navigation() {
   };
 
   return (
-    <BlurView intensity={GLASS.intensity} tint={GLASS.tint} style={styles.container}>
+    <View style={styles.container}>
       {TABS.map((tab) => {
         const active = isActive(tab.id);
         return (
@@ -47,10 +75,10 @@ export default function Navigation() {
             style={styles.tab}
             activeOpacity={0.7}
           >
-            <Ionicons
+            <AnimatedIcon
               name={active ? tab.activeIcon : tab.icon}
-              size={24}
               color={active ? ACTIVE_COLOR : INACTIVE_COLOR}
+              focused={active}
             />
             <Text style={[styles.tabLabel, active && styles.activeLabel]}>
               {tab.label}
@@ -58,11 +86,9 @@ export default function Navigation() {
           </TouchableOpacity>
         );
       })}
-    </BlurView>
+    </View>
   );
 }
-
-const NAV_HEIGHT = 56;
 
 const styles = StyleSheet.create({
   container: {
@@ -70,21 +96,19 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    height: NAV_HEIGHT,
+    height: 84,
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     justifyContent: 'space-around',
-    backgroundColor: GLASS.backgroundColor,
-    borderTopWidth: 1,
-    borderTopColor: GLASS.borderColor,
-    paddingTop: 6,
-    paddingHorizontal: 4,
-    paddingBottom: 8,
+    backgroundColor: '#FFFFFF',
+    borderTopWidth: 0,
+    paddingTop: 8,
+    paddingBottom: 28,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: -1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 8,
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.06,
+    shadowRadius: 12,
+    elevation: 12,
   },
   tab: {
     alignItems: 'center',
@@ -96,6 +120,8 @@ const styles = StyleSheet.create({
   tabLabel: {
     ...IOS_TYPOGRAPHY.caption2,
     color: INACTIVE_COLOR,
+    fontWeight: '600',
+    fontSize: 11,
   },
   activeLabel: {
     color: ACTIVE_COLOR,

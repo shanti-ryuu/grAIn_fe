@@ -4,7 +4,10 @@
     "slug": "grAIn-fe",
     "scheme": "grain",
     "version": "1.0.0",
-    "platforms": ["ios", "android"],
+    "platforms": [
+      "ios",
+      "android"
+    ],
     "ios": {
       "icon": "./assets/icon.png"
     },

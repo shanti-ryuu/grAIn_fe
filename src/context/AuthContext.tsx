@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useReducer, useEffect, useCallback } from 'react';
+import * as SecureStore from 'expo-secure-store';
 import { grainApi } from '@/api';
 import type { User } from '@/api';
 
@@ -71,14 +72,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const restoreAuth = async () => {
     try {
-      const isAuth = await grainApi.auth.isAuthenticated();
-      if (isAuth) {
+      const token = await SecureStore.getItemAsync('grain_token');
+      if (token) {
         const user = await grainApi.auth.getCurrentUser();
         dispatch({ type: 'AUTH_SUCCESS', payload: user });
       } else {
         dispatch({ type: 'AUTH_LOGOUT' });
       }
-    } catch (error) {
+    } catch (error: any) {
+      if (error?.status === 401 || (error as any)?.code === 401) {
+        await SecureStore.deleteItemAsync('grain_token');
+      }
       dispatch({ type: 'AUTH_LOGOUT' });
     }
   };

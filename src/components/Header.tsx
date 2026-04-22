@@ -1,13 +1,14 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, Image, Alert, StyleSheet } from 'react-native';
-import { BlurView } from 'expo-blur';
 import * as Haptics from 'expo-haptics';
 import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 import { useAppContext } from '@/context/AppContext';
-import { GLASS, IOS_TYPOGRAPHY } from '@/utils/constants';
+import { IOS_TYPOGRAPHY } from '@/utils/constants';
 
 export default function Header() {
   const { handleLogout } = useAppContext();
+  const router = useRouter();
 
   const confirmLogout = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -17,38 +18,43 @@ export default function Header() {
     ]);
   };
 
+  const handleLogoPress = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    router.push('/(app)/dashboard' as any);
+  };
+
   return (
-    <BlurView intensity={GLASS.intensity} tint={GLASS.tint} style={styles.container}>
+    <View style={styles.container}>
       <View style={styles.content}>
-        <View style={styles.leftSection}>
+        <TouchableOpacity onPress={handleLogoPress} style={styles.leftSection} activeOpacity={0.7}>
           <Image
             source={require('../../assets/icon.png')}
             style={styles.logo}
             resizeMode="contain"
           />
           <Text style={styles.title}>Grain Dryer System</Text>
-        </View>
+        </TouchableOpacity>
         <TouchableOpacity
           onPress={confirmLogout}
           style={styles.logoutButton}
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
         >
-          <Ionicons name="log-out-outline" size={22} color="rgba(0,0,0,0.4)" />
+          <Ionicons name="log-out-outline" size={22} color="#9CA3AF" />
         </TouchableOpacity>
       </View>
-    </BlurView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: GLASS.backgroundColor,
-    borderBottomWidth: 1,
-    borderBottomColor: GLASS.borderColor,
+    backgroundColor: '#FFFFFF',
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#E5E7EB',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
     elevation: 2,
   },
   content: {

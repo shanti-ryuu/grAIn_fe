@@ -7,6 +7,7 @@
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true,
     "moduleResolution": "bundler",
+    "customConditions": ["react-native", "react-native-strict-api"],
     "allowSyntheticDefaultImports": true,
     "baseUrl": ".",
     "paths": {
@@ -17,7 +18,12 @@
   },
   "extends": "expo/tsconfig.base",
   "include": [
-    "**/*.ts",
-    "**/*.tsx"
+    "app/**/*.ts",
+    "app/**/*.tsx",
+    "src/**/*.ts",
+    "src/**/*.tsx"
+  ],
+  "exclude": [
+    "node_modules"
   ]
 }

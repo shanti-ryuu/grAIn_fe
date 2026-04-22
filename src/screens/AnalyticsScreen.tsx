@@ -7,31 +7,31 @@ import {
   TouchableOpacity,
   StyleSheet,
   ActivityIndicator,
-  StatusBar,
   Dimensions,
-  SafeAreaView,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { StatusBar } from 'expo-status-bar';
 import { LinearGradient } from 'expo-linear-gradient';
-import { BlurView } from 'expo-blur';
 import * as Haptics from 'expo-haptics';
 import { Ionicons } from '@expo/vector-icons';
+import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import { LineChart, BarChart } from 'react-native-chart-kit';
 import { Header, Navigation } from '@/components';
 import { grainApi } from '@/api';
-import { GRADIENTS, GLASS, IOS_TYPOGRAPHY } from '@/utils/constants';
-import type { SensorData } from '@/api';
+import { GRADIENTS, IOS_TYPOGRAPHY } from '@/utils/constants';
+import type { AnalyticsOverview } from '@/api';
 
 type PeriodType = 'daily' | 'weekly' | 'monthly';
 
-const screenWidth = Dimensions.get('window').width - 64;
+const screenWidth = Dimensions.get('window').width - 48;
 
 const chartConfig = {
-  backgroundColor: 'transparent',
-  backgroundGradientFrom: 'transparent',
-  backgroundGradientTo: 'transparent',
+  backgroundColor: '#FFFFFF',
+  backgroundGradientFrom: '#FFFFFF',
+  backgroundGradientTo: '#FFFFFF',
   decimalPlaces: 1,
   color: (opacity: number = 1) => `rgba(34, 197, 94, ${opacity})`,
-  labelColor: (opacity: number = 1) => `rgba(0, 0, 0, ${opacity * 0.5})`,
+  labelColor: (opacity: number = 1) => `rgba(107, 114, 128, ${opacity})`,
   style: {
     borderRadius: 16,
   },
@@ -42,24 +42,30 @@ const chartConfig = {
   },
 };
 
+const fallbackData = {
+  labels: ['--'],
+  datasets: [{ data: [0] }],
+};
+
 export default function AnalyticsScreen() {
-  const [sensorData, setSensorData] = useState<SensorData[]>([]);
+  const [overview, setOverview] = useState<AnalyticsOverview | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [period, setPeriod] = useState<PeriodType>('weekly');
   const [refreshing, setRefreshing] = useState(false);
 
   const fetchData = useCallback(async () => {
     try {
-      const response = await grainApi.sensors.getData('analytics', { hours: period === 'daily' ? 24 : period === 'weekly' ? 168 : 720 });
-      setSensorData(response.data);
+      const data = await grainApi.analytics.getOverview(period);
+      setOverview(data);
     } catch {
-      setSensorData([]);
+      setOverview(null);
     } finally {
       setIsLoading(false);
     }
   }, [period]);
 
   useEffect(() => {
+    setIsLoading(true);
     fetchData();
   }, [fetchData]);
 
@@ -75,104 +81,110 @@ export default function AnalyticsScreen() {
     { key: 'monthly', label: 'Monthly' },
   ];
 
-  const last6 = sensorData.slice(0, 6);
-  const labels = last6.map((d) =>
-    new Date(d.timestamp).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
-  );
-  const moistureData = last6.map((d) => d.moisture);
-  const energyData = last6.map((d) => d.energy);
-  const fanSpeedData = last6.map((d) => d.fanSpeed);
+  const moistureTrend = overview?.moistureTrend || [];
+  const dryingCycles = overview?.dryingCycles || [];
+  const energyConsumption = overview?.energyConsumption || [];
+
+  const moistureChartData = moistureTrend.length > 0
+    ? { labels: moistureTrend.map((d) => d.label), datasets: [{ data: moistureTrend.map((d) => d.value) }] }
+    : fallbackData;
+
+  const cycleChartData = dryingCycles.length > 0
+    ? { labels: dryingCycles.map((d) => d.label), datasets: [{ data: dryingCycles.map((d) => d.value) }] }
+    : fallbackData;
+
+  const energyChartData = energyConsumption.length > 0
+    ? { labels: energyConsumption.map((d) => d.label), datasets: [{ data: energyConsumption.map((d) => d.value) }] }
+    : fallbackData;
 
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="dark-content" />
+    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+      <StatusBar style="dark" />
       <LinearGradient colors={GRADIENTS.analytics} style={styles.gradient}>
         <Header />
-        <ScrollView
-          style={styles.scrollView}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#22C55E" />}
-          contentContainerStyle={styles.scrollContent}
-        >
-          <Text style={styles.screenTitle}>Analytics</Text>
-          <Text style={styles.screenSubtitle}>View drying trends and performance metrics</Text>
+        <Animated.View entering={FadeIn.duration(200)} exiting={FadeOut.duration(150)} style={{ flex: 1 }}>
+          <ScrollView
+            style={styles.scrollView}
+            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#22C55E" />}
+            contentContainerStyle={styles.scrollContent}
+          >
+            <Text style={styles.screenTitle}>Analytics</Text>
+            <Text style={styles.screenSubtitle}>View drying trends and performance metrics</Text>
 
-          <View style={styles.filterRow}>
-            {periods.map((p) => (
-              <TouchableOpacity
-                key={p.key}
-                style={[styles.filterButton, period === p.key && styles.filterActive]}
-                onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setPeriod(p.key); }}
-                activeOpacity={0.7}
-              >
-                <Text style={[styles.filterText, period === p.key && styles.filterActiveText]}>
-                  {p.label}
-                </Text>
+            <View style={styles.filterRow}>
+              {periods.map((p) => (
+                <TouchableOpacity
+                  key={p.key}
+                  style={[styles.filterButton, period === p.key && styles.filterActive]}
+                  onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setPeriod(p.key); }}
+                  activeOpacity={0.7}
+                >
+                  <Text style={[styles.filterText, period === p.key && styles.filterActiveText]}>
+                    {p.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <View style={styles.exportRow}>
+              <TouchableOpacity style={styles.exportButton} activeOpacity={0.7}>
+                <Ionicons name="document-text-outline" size={16} color="#22C55E" />
+                <Text style={styles.exportText}>Export CSV</Text>
               </TouchableOpacity>
-            ))}
-          </View>
-
-          <View style={styles.exportRow}>
-            <TouchableOpacity style={styles.exportButton} activeOpacity={0.7}>
-              <Ionicons name="document-text-outline" size={16} color="#22C55E" />
-              <Text style={styles.exportText}>Export CSV</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.exportButton} activeOpacity={0.7}>
-              <Ionicons name="document-attach-outline" size={16} color="#22C55E" />
-              <Text style={styles.exportText}>Export PDF</Text>
-            </TouchableOpacity>
-          </View>
-
-          {isLoading ? (
-            <View style={styles.loadingContainer}>
-              <ActivityIndicator size="large" color="#22C55E" />
+              <TouchableOpacity style={styles.exportButton} activeOpacity={0.7}>
+                <Ionicons name="document-attach-outline" size={16} color="#22C55E" />
+                <Text style={styles.exportText}>Export PDF</Text>
+              </TouchableOpacity>
             </View>
-          ) : sensorData.length === 0 ? (
-            <View style={styles.emptyContainer}>
-              <Ionicons name="bar-chart-outline" size={48} color="#9CA3AF" />
-              <Text style={styles.emptyText}>No data available</Text>
-            </View>
-          ) : (
-            <>
-              <BlurView intensity={GLASS.intensity} tint={GLASS.tint} style={styles.glassCard}>
-                <Text style={styles.chartTitle}>Moisture Levels Over Time</Text>
-                <LineChart
-                  data={{ labels, datasets: [{ data: moistureData }] }}
-                  width={screenWidth}
-                  height={200}
-                  chartConfig={chartConfig}
-                  bezier
-                  style={styles.chart}
-                />
-              </BlurView>
 
-              <BlurView intensity={GLASS.intensity} tint={GLASS.tint} style={styles.glassCard}>
-                <Text style={styles.chartTitle}>Energy Consumption</Text>
-                <BarChart
-                  data={{ labels, datasets: [{ data: energyData.length > 0 ? energyData : [0] }] }}
-                  width={screenWidth}
-                  height={200}
-                  chartConfig={chartConfig}
-                  style={styles.chart}
-                  yAxisLabel=""
-                  yAxisSuffix="kWh"
-                />
-              </BlurView>
+            {isLoading ? (
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator size="large" color="#22C55E" />
+                <Text style={styles.loadingText}>Loading analytics...</Text>
+              </View>
+            ) : (
+              <>
+                <View style={styles.chartCard}>
+                  <Text style={styles.chartTitle}>Moisture Levels Over Time</Text>
+                  <LineChart
+                    data={moistureChartData}
+                    width={screenWidth}
+                    height={200}
+                    chartConfig={chartConfig}
+                    bezier
+                    style={styles.chart}
+                  />
+                </View>
 
-              <BlurView intensity={GLASS.intensity} tint={GLASS.tint} style={styles.glassCard}>
-                <Text style={styles.chartTitle}>Fan Speed</Text>
-                <BarChart
-                  data={{ labels, datasets: [{ data: fanSpeedData.length > 0 ? fanSpeedData : [0] }] }}
-                  width={screenWidth}
-                  height={200}
-                  chartConfig={chartConfig}
-                  style={styles.chart}
-                  yAxisLabel=""
-                  yAxisSuffix="%"
-                />
-              </BlurView>
-            </>
-          )}
-        </ScrollView>
+                <View style={styles.chartCard}>
+                  <Text style={styles.chartTitle}>Drying Cycle Duration</Text>
+                  <BarChart
+                    data={cycleChartData}
+                    width={screenWidth}
+                    height={200}
+                    chartConfig={chartConfig}
+                    style={styles.chart}
+                    yAxisLabel=""
+                    yAxisSuffix="hrs"
+                  />
+                </View>
+
+                <View style={styles.chartCard}>
+                  <Text style={styles.chartTitle}>Weekly Energy Consumption</Text>
+                  <BarChart
+                    data={energyChartData}
+                    width={screenWidth}
+                    height={200}
+                    chartConfig={chartConfig}
+                    style={styles.chart}
+                    yAxisLabel=""
+                    yAxisSuffix="kWh"
+                  />
+                </View>
+              </>
+            )}
+          </ScrollView>
+        </Animated.View>
         <Navigation />
       </LinearGradient>
     </SafeAreaView>
@@ -200,7 +212,7 @@ const styles = StyleSheet.create({
   },
   screenSubtitle: {
     ...IOS_TYPOGRAPHY.footnote,
-    color: 'rgba(0,0,0,0.5)',
+    color: '#6B7280',
   },
   filterRow: {
     flexDirection: 'row',
@@ -218,7 +230,7 @@ const styles = StyleSheet.create({
   filterText: {
     ...IOS_TYPOGRAPHY.footnote,
     fontWeight: '600',
-    color: 'rgba(0,0,0,0.5)',
+    color: '#6B7280',
   },
   filterActiveText: {
     color: '#FFFFFF',
@@ -237,25 +249,23 @@ const styles = StyleSheet.create({
     borderRadius: 50,
     borderWidth: 1.5,
     borderColor: '#22C55E',
-    backgroundColor: 'rgba(255,255,255,0.6)',
+    backgroundColor: '#FFFFFF',
   },
   exportText: {
     ...IOS_TYPOGRAPHY.footnote,
     fontWeight: '600',
     color: '#22C55E',
   },
-  glassCard: {
-    backgroundColor: GLASS.backgroundColor,
-    borderWidth: 1,
-    borderColor: GLASS.borderColor,
-    borderRadius: GLASS.borderRadius,
-    padding: 12,
+  chartCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 16,
     overflow: 'hidden',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: GLASS.shadowOpacity,
-    shadowRadius: GLASS.shadowRadius,
-    elevation: 5,
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 3,
   },
   chartTitle: {
     ...IOS_TYPOGRAPHY.headline,
@@ -268,14 +278,10 @@ const styles = StyleSheet.create({
   loadingContainer: {
     paddingVertical: 48,
     alignItems: 'center',
+    gap: 12,
   },
-  emptyContainer: {
-    alignItems: 'center',
-    paddingVertical: 48,
-    gap: 8,
-  },
-  emptyText: {
+  loadingText: {
     ...IOS_TYPOGRAPHY.footnote,
-    color: 'rgba(0,0,0,0.5)',
+    color: '#6B7280',
   },
 });
