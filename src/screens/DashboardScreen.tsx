@@ -76,7 +76,7 @@ export default function DashboardScreen() {
 
   const handleDevicePress = (device: Device) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    router.push(`/(app)/device/${device._id}` as any);
+    router.push(`/(app)/device/${device.deviceId}` as any);
   };
 
   const handleAddDevice = () => {

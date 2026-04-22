@@ -228,7 +228,8 @@ class GrainApiClient {
       const response = await this.client.get<ApiResponse<Device[]>>('/devices')
       const data = response.data.data || response.data
       if (Array.isArray(data)) {
-        return data
+        // Map backend 'id' field to frontend '_id'
+        return data.map((d: any) => ({ ...d, _id: d._id || d.id }))
       }
       throw new Error('Invalid devices response')
     },
@@ -236,7 +237,9 @@ class GrainApiClient {
     getById: async (id: string): Promise<Device> => {
       const response = await this.client.get<ApiResponse<{ device: Device }>>(`/devices/${id}`)
       if (response.data.data) {
-        return (response.data.data as any).device ?? response.data.data as any
+        const raw = (response.data.data as any).device ?? response.data.data as any
+        // Map backend 'id' field to frontend '_id'
+        return { ...raw, _id: raw._id || raw.id }
       }
       throw new Error('Invalid device response')
     },
