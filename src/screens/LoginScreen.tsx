@@ -65,6 +65,7 @@ export default function LoginScreen() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     try {
       await login(email.trim(), password.trim());
+      router.replace('/(app)/dashboard');
     } catch (err: any) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       Alert.alert('Login Failed', err?.message || 'Invalid credentials');
@@ -75,6 +76,7 @@ export default function LoginScreen() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     try {
       await login('demo@grain.com', 'demo123');
+      router.replace('/(app)/dashboard');
     } catch (err: any) {
       Alert.alert('Demo Login Failed', 'Demo account not available');
     }

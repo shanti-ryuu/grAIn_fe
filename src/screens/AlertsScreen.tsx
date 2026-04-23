@@ -16,8 +16,10 @@ import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import { Ionicons } from '@expo/vector-icons';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Header, Navigation, AlertCard } from '@/components';
 import { grainApi } from '@/api';
+import { useAppContext } from '@/context/AppContext';
 import { GRADIENTS, IOS_TYPOGRAPHY } from '@/utils/constants';
 
 interface AlertEntry {
@@ -45,6 +47,36 @@ export default function AlertsScreen() {
   const [criticalAlerts, setCriticalAlerts] = useState(true);
   const [warningAlerts, setWarningAlerts] = useState(true);
   const [infoAlerts, setInfoAlerts] = useState(true);
+  const { showToast } = useAppContext();
+
+  const ALERT_SETTINGS_KEY = 'grain_alert_settings';
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const stored = await AsyncStorage.getItem(ALERT_SETTINGS_KEY);
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          if (parsed.criticalAlerts !== undefined) setCriticalAlerts(parsed.criticalAlerts);
+          if (parsed.warningAlerts !== undefined) setWarningAlerts(parsed.warningAlerts);
+          if (parsed.infoAlerts !== undefined) setInfoAlerts(parsed.infoAlerts);
+        }
+      } catch (err) {
+        console.error('Failed to load alert settings:', err);
+      }
+    })();
+  }, []);
+
+  const persistAlertSetting = useCallback(async (key: string, value: boolean) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    const next = { criticalAlerts, warningAlerts, infoAlerts, [key]: value };
+    try {
+      await AsyncStorage.setItem(ALERT_SETTINGS_KEY, JSON.stringify(next));
+      showToast('Alert setting saved', 'success');
+    } catch (err) {
+      showToast('Failed to save setting', 'error');
+    }
+  }, [criticalAlerts, warningAlerts, infoAlerts, showToast]);
 
   const fetchAlerts = useCallback(async () => {
     try {
@@ -132,7 +164,7 @@ export default function AlertsScreen() {
             </View>
           ) : filteredAlerts.length === 0 ? (
             <View style={styles.emptyContainer}>
-              <Ionicons name="notifications-off-outline" size={48} color="#9CA3AF" />
+              <Ionicons name="checkmark-circle-outline" size={48} color="#22C55E" />
               <Text style={styles.emptyText}>No alerts</Text>
               <Text style={styles.emptySubtext}>You're all caught up!</Text>
             </View>
@@ -152,7 +184,7 @@ export default function AlertsScreen() {
               </View>
               <Switch
                 value={criticalAlerts}
-                onValueChange={setCriticalAlerts}
+                onValueChange={(v) => { setCriticalAlerts(v); persistAlertSetting('criticalAlerts', v); }}
                 trackColor={{ false: 'rgba(0,0,0,0.08)', true: '#22C55E' }}
                 thumbColor="#FFFFFF"
               />
@@ -165,7 +197,7 @@ export default function AlertsScreen() {
               </View>
               <Switch
                 value={warningAlerts}
-                onValueChange={setWarningAlerts}
+                onValueChange={(v) => { setWarningAlerts(v); persistAlertSetting('warningAlerts', v); }}
                 trackColor={{ false: 'rgba(0,0,0,0.08)', true: '#22C55E' }}
                 thumbColor="#FFFFFF"
               />
@@ -178,7 +210,7 @@ export default function AlertsScreen() {
               </View>
               <Switch
                 value={infoAlerts}
-                onValueChange={setInfoAlerts}
+                onValueChange={(v) => { setInfoAlerts(v); persistAlertSetting('infoAlerts', v); }}
                 trackColor={{ false: 'rgba(0,0,0,0.08)', true: '#22C55E' }}
                 thumbColor="#FFFFFF"
               />

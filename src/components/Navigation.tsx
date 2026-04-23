@@ -18,7 +18,8 @@ interface TabConfig {
 
 const TABS: TabConfig[] = [
   { id: 'dashboard', label: 'Dashboard', icon: 'grid-outline', activeIcon: 'grid', path: '/(app)/dashboard' },
-  { id: 'control', label: 'Control', icon: 'person-outline', activeIcon: 'person', path: '/(app)/control' },
+  { id: 'control', label: 'Control', icon: 'hardware-chip-outline', activeIcon: 'hardware-chip', path: '/(app)/control' },
+  { id: 'ai-prediction', label: 'AI', icon: 'sparkles-outline', activeIcon: 'sparkles', path: '/(app)/ai-prediction' },
   { id: 'analytics', label: 'Analytics', icon: 'bar-chart-outline', activeIcon: 'bar-chart', path: '/(app)/analytics' },
   { id: 'alerts', label: 'Alerts', icon: 'notifications-outline', activeIcon: 'notifications', path: '/(app)/alerts' },
   { id: 'settings', label: 'Settings', icon: 'settings-outline', activeIcon: 'settings', path: '/(app)/settings' },

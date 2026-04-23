@@ -15,6 +15,7 @@ type AuthAction =
   | { type: 'AUTH_SUCCESS'; payload: User }
   | { type: 'AUTH_ERROR'; payload: string }
   | { type: 'AUTH_LOGOUT' }
+  | { type: 'SET_LOADING'; payload: boolean }
   | { type: 'CLEAR_ERROR' };
 
 const initialState: AuthState = {
@@ -34,6 +35,8 @@ function authReducer(state: AuthState, action: AuthAction): AuthState {
       return { ...state, isLoading: false, isAuthenticated: false, user: null, error: action.payload };
     case 'AUTH_LOGOUT':
       return { ...initialState, isLoading: false };
+    case 'SET_LOADING':
+      return { ...state, isLoading: action.payload };
     case 'CLEAR_ERROR':
       return { ...state, error: null };
     default:
@@ -80,10 +83,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         dispatch({ type: 'AUTH_LOGOUT' });
       }
     } catch (error: any) {
-      if (error?.status === 401 || (error as any)?.code === 401) {
-        await SecureStore.deleteItemAsync('grain_token');
-      }
+      await SecureStore.deleteItemAsync('grain_token').catch(() => {});
       dispatch({ type: 'AUTH_LOGOUT' });
+    } finally {
+      dispatch({ type: 'SET_LOADING', payload: false });
     }
   };
 

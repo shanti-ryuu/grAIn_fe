@@ -1,20 +1,36 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, Image, Alert, StyleSheet } from 'react-native';
 import * as Haptics from 'expo-haptics';
+import * as SecureStore from 'expo-secure-store';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import { useAuth } from '@/hooks';
 import { useAppContext } from '@/context/AppContext';
 import { IOS_TYPOGRAPHY } from '@/utils/constants';
 
 export default function Header() {
   const { handleLogout } = useAppContext();
+  const { logout: authLogout } = useAuth();
   const router = useRouter();
 
   const confirmLogout = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     Alert.alert('Logout', 'Are you sure you want to logout?', [
       { text: 'Cancel', style: 'cancel' },
-      { text: 'Logout', style: 'destructive', onPress: handleLogout },
+      {
+        text: 'Logout',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await handleLogout();
+            await authLogout();
+            await SecureStore.deleteItemAsync('grain_token').catch(() => {});
+            router.replace('/(auth)/login');
+          } catch (err) {
+            console.error('Logout error:', err);
+          }
+        },
+      },
     ]);
   };
 

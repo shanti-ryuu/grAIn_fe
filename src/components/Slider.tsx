@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 
 interface SliderProps {
@@ -21,6 +21,10 @@ export default function CustomSlider({
   onValueChange,
 }: SliderProps) {
   const [currentValue, setCurrentValue] = useState(value);
+
+  useEffect(() => {
+    setCurrentValue(value);
+  }, [value]);
 
   const percentage = ((currentValue - minimumValue) / (maximumValue - minimumValue)) * 100;
 

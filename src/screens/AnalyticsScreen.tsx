@@ -18,6 +18,7 @@ import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import { LineChart, BarChart } from 'react-native-chart-kit';
 import { Header, Navigation } from '@/components';
 import { grainApi } from '@/api';
+import { useAppContext } from '@/context/AppContext';
 import { GRADIENTS, IOS_TYPOGRAPHY } from '@/utils/constants';
 import type { AnalyticsOverview } from '@/api';
 
@@ -29,6 +30,8 @@ const chartConfig = {
   backgroundColor: '#FFFFFF',
   backgroundGradientFrom: '#FFFFFF',
   backgroundGradientTo: '#FFFFFF',
+  fillShadowGradient: '#FFFFFF',
+  fillShadowGradientOpacity: 0,
   decimalPlaces: 1,
   color: (opacity: number = 1) => `rgba(34, 197, 94, ${opacity})`,
   labelColor: (opacity: number = 1) => `rgba(107, 114, 128, ${opacity})`,
@@ -43,8 +46,8 @@ const chartConfig = {
 };
 
 const fallbackData = {
-  labels: ['--'],
-  datasets: [{ data: [0] }],
+  labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+  datasets: [{ data: [0, 0, 0, 0, 0, 0, 0] }],
 };
 
 export default function AnalyticsScreen() {
@@ -52,6 +55,7 @@ export default function AnalyticsScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [period, setPeriod] = useState<PeriodType>('weekly');
   const [refreshing, setRefreshing] = useState(false);
+  const { showToast } = useAppContext();
 
   const fetchData = useCallback(async () => {
     try {
@@ -85,17 +89,23 @@ export default function AnalyticsScreen() {
   const dryingCycles = overview?.dryingCycles || [];
   const energyConsumption = overview?.energyConsumption || [];
 
+  const safeChartData = (items: Array<{ label: string; value: number }>, fallback: typeof fallbackData) => {
+    if (!items || items.length === 0) return fallback;
+    const values = items.map((d) => d.value);
+    // BarChart crashes if any value <= 0, so floor at a small positive number
+    const safeValues = values.map((v) => Math.max(v, 0.1));
+    return {
+      labels: items.map((d) => d.label || '--'),
+      datasets: [{ data: safeValues }],
+    };
+  };
+
   const moistureChartData = moistureTrend.length > 0
-    ? { labels: moistureTrend.map((d) => d.label), datasets: [{ data: moistureTrend.map((d) => d.value) }] }
+    ? { labels: moistureTrend.map((d) => d.label || '--'), datasets: [{ data: moistureTrend.map((d) => d.value) }] }
     : fallbackData;
 
-  const cycleChartData = dryingCycles.length > 0
-    ? { labels: dryingCycles.map((d) => d.label), datasets: [{ data: dryingCycles.map((d) => d.value) }] }
-    : fallbackData;
-
-  const energyChartData = energyConsumption.length > 0
-    ? { labels: energyConsumption.map((d) => d.label), datasets: [{ data: energyConsumption.map((d) => d.value) }] }
-    : fallbackData;
+  const cycleChartData = safeChartData(dryingCycles, fallbackData);
+  const energyChartData = safeChartData(energyConsumption, fallbackData);
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
@@ -127,11 +137,11 @@ export default function AnalyticsScreen() {
             </View>
 
             <View style={styles.exportRow}>
-              <TouchableOpacity style={styles.exportButton} activeOpacity={0.7}>
+              <TouchableOpacity style={styles.exportButton} activeOpacity={0.7} onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); showToast('CSV export coming soon', 'info'); }}>
                 <Ionicons name="document-text-outline" size={16} color="#22C55E" />
                 <Text style={styles.exportText}>Export CSV</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.exportButton} activeOpacity={0.7}>
+              <TouchableOpacity style={styles.exportButton} activeOpacity={0.7} onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); showToast('PDF export coming soon', 'info'); }}>
                 <Ionicons name="document-attach-outline" size={16} color="#22C55E" />
                 <Text style={styles.exportText}>Export PDF</Text>
               </TouchableOpacity>

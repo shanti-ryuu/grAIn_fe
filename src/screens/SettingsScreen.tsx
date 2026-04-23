@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, Switch, StyleSheet, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
@@ -6,24 +6,69 @@ import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import { Ionicons } from '@expo/vector-icons';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as SecureStore from 'expo-secure-store';
+import { useRouter } from 'expo-router';
+import { useAuth } from '@/hooks';
 import { useAppContext } from '@/context/AppContext';
+import { useDevices } from '@/hooks';
 import { Header, Navigation, StatusBadge } from '@/components';
 import { DEFAULT_SETTINGS, GRADIENTS, IOS_TYPOGRAPHY } from '@/utils/constants';
 
-export default function SettingsScreen() {
-  const { handleLogout, showToast } = useAppContext();
-  const [settings, setSettings] = useState(DEFAULT_SETTINGS);
+const SETTINGS_KEY = 'grain_settings';
 
-  const updateSetting = (key: string, value: any) => {
+export default function SettingsScreen() {
+  const router = useRouter();
+  const { user, logout } = useAuth();
+  const { showToast } = useAppContext();
+  const { devices } = useDevices();
+  const [settings, setSettings] = useState(DEFAULT_SETTINGS);
+  const [settingsLoaded, setSettingsLoaded] = useState(false);
+
+  // Load settings from AsyncStorage on mount
+  useEffect(() => {
+    (async () => {
+      try {
+        const stored = await AsyncStorage.getItem(SETTINGS_KEY);
+        if (stored) {
+          setSettings({ ...DEFAULT_SETTINGS, ...JSON.parse(stored) });
+        }
+      } catch (err) {
+        console.error('Failed to load settings:', err);
+      } finally {
+        setSettingsLoaded(true);
+      }
+    })();
+  }, []);
+
+  const updateSetting = useCallback(async (key: string, value: any) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    setSettings((prev) => ({ ...prev, [key]: value }));
-    showToast('Setting updated', 'success');
-  };
+    const next = { ...settings, [key]: value };
+    setSettings(next);
+    try {
+      await AsyncStorage.setItem(SETTINGS_KEY, JSON.stringify(next));
+      showToast('Setting saved', 'success');
+    } catch (err) {
+      showToast('Failed to save setting', 'error');
+    }
+  }, [settings, showToast]);
 
   const handleLogoutPress = () => {
     Alert.alert('Logout', 'Are you sure you want to logout?', [
       { text: 'Cancel', style: 'cancel' },
-      { text: 'Logout', style: 'destructive', onPress: handleLogout },
+      {
+        text: 'Logout',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await logout();
+            await SecureStore.deleteItemAsync('grain_token').catch(() => {});
+            router.replace('/(auth)/login');
+          } catch (err) {
+            console.error('Logout error:', err);
+          }
+        },
+      },
     ]);
   };
 
@@ -36,30 +81,44 @@ export default function SettingsScreen() {
         <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
           <Text style={styles.screenTitle}>Settings</Text>
 
+          {/* User Info */}
+          {user && (
+            <View style={styles.card}>
+              <Text style={styles.cardLabel}>ACCOUNT</Text>
+              <View style={styles.userRow}>
+                <View style={styles.avatar}>
+                  <Text style={styles.avatarText}>{user.name?.charAt(0)?.toUpperCase() || 'U'}</Text>
+                </View>
+                <View style={styles.userInfo}>
+                  <Text style={styles.userName}>{user.name}</Text>
+                  <Text style={styles.userEmail}>{user.email}</Text>
+                </View>
+              </View>
+            </View>
+          )}
+
+          {/* Connected Devices */}
           <View style={styles.card}>
             <Text style={styles.cardLabel}>CONNECTED DEVICES</Text>
-            <View style={styles.deviceRow}>
-              <View style={styles.deviceInfo}>
-                <Ionicons name="hardware-chip-outline" size={20} color="#22C55E" />
-                <View style={styles.deviceText}>
-                  <Text style={styles.deviceName}>Grain Dryer #1</Text>
-                  <Text style={styles.deviceSub}>Main drying unit</Text>
+            {devices.length === 0 ? (
+              <Text style={styles.noDevices}>No devices connected</Text>
+            ) : (
+              devices.map((device, idx) => (
+                <View key={device._id || device.deviceId || idx} style={styles.deviceRow}>
+                  <View style={styles.deviceInfo}>
+                    <Ionicons name="hardware-chip-outline" size={20} color={device.status === 'online' ? '#22C55E' : 'rgba(0,0,0,0.3)'} />
+                    <View style={styles.deviceText}>
+                      <Text style={styles.deviceName}>{device.name || device.deviceId}</Text>
+                      <Text style={styles.deviceSub}>{device.location || 'No location'}</Text>
+                    </View>
+                  </View>
+                  <StatusBadge status={device.status === 'online' ? 'running' : 'offline'} size="sm" />
                 </View>
-              </View>
-              <StatusBadge status="running" size="sm" />
-            </View>
-            <View style={styles.deviceRow}>
-              <View style={styles.deviceInfo}>
-                <Ionicons name="hardware-chip-outline" size={20} color="rgba(0,0,0,0.3)" />
-                <View style={styles.deviceText}>
-                  <Text style={styles.deviceName}>Grain Dryer #2</Text>
-                  <Text style={styles.deviceSub}>Secondary unit</Text>
-                </View>
-              </View>
-              <StatusBadge status="offline" size="sm" />
-            </View>
+              ))
+            )}
           </View>
 
+          {/* Preferences */}
           <View style={styles.card}>
             <Text style={styles.cardLabel}>PREFERENCES</Text>
 
@@ -139,133 +198,34 @@ export default function SettingsScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  gradient: {
-    flex: 1,
-  },
-  scrollView: {
-    flex: 1,
-  },
-  scrollContent: {
-    padding: 16,
-    paddingBottom: 72,
-    gap: 12,
-  },
-  screenTitle: {
-    ...IOS_TYPOGRAPHY.largeTitle,
-    color: '#111111',
-  },
-  card: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    padding: 16,
-    overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
-    elevation: 3,
-  },
-  cardLabel: {
-    ...IOS_TYPOGRAPHY.caption2,
-    fontWeight: '600',
-    color: '#6B7280',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    marginBottom: 8,
-  },
-  deviceRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
-  },
-  deviceInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    flex: 1,
-  },
-  deviceText: {
-    flex: 1,
-  },
-  deviceName: {
-    ...IOS_TYPOGRAPHY.body,
-    color: '#111111',
-  },
-  deviceSub: {
-    ...IOS_TYPOGRAPHY.footnote,
-    color: '#6B7280',
-    marginTop: 2,
-  },
-  settingRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
-  },
-  settingInfo: {
-    flex: 1,
-    marginRight: 12,
-  },
-  settingLabel: {
-    ...IOS_TYPOGRAPHY.body,
-    color: '#111111',
-  },
-  settingDesc: {
-    ...IOS_TYPOGRAPHY.footnote,
-    color: '#6B7280',
-    marginTop: 2,
-  },
-  unitToggle: {
-    flexDirection: 'row',
-    backgroundColor: '#F3F4F6',
-    borderRadius: 50,
-    padding: 2,
-  },
-  unitButton: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 50,
-  },
-  unitActive: {
-    backgroundColor: '#FFFFFF',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 1,
-  },
-  unitText: {
-    ...IOS_TYPOGRAPHY.callout,
-    fontWeight: '600',
-    color: '#9CA3AF',
-  },
-  unitActiveText: {
-    color: '#22C55E',
-  },
-  logoutButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    backgroundColor: '#EF4444',
-    borderRadius: 50,
-    paddingVertical: 16,
-    shadowColor: '#EF4444',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  logoutButtonText: {
-    color: '#FFFFFF',
-    ...IOS_TYPOGRAPHY.headline,
-  },
+  container: { flex: 1 },
+  gradient: { flex: 1 },
+  scrollView: { flex: 1 },
+  scrollContent: { padding: 16, paddingBottom: 72, gap: 12 },
+  screenTitle: { ...IOS_TYPOGRAPHY.largeTitle, color: '#111111' },
+  card: { backgroundColor: '#FFFFFF', borderRadius: 16, padding: 16, overflow: 'hidden', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 8, elevation: 3 },
+  cardLabel: { ...IOS_TYPOGRAPHY.caption2, fontWeight: '600', color: '#6B7280', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 },
+  userRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  avatar: { width: 44, height: 44, borderRadius: 22, backgroundColor: '#22C55E', alignItems: 'center', justifyContent: 'center' },
+  avatarText: { color: '#FFFFFF', fontSize: 18, fontWeight: '700' },
+  userInfo: { flex: 1 },
+  userName: { ...IOS_TYPOGRAPHY.headline, color: '#111111' },
+  userEmail: { ...IOS_TYPOGRAPHY.footnote, color: '#6B7280', marginTop: 2 },
+  noDevices: { ...IOS_TYPOGRAPHY.footnote, color: '#9CA3AF', textAlign: 'center', paddingVertical: 12 },
+  deviceRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#E5E7EB' },
+  deviceInfo: { flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 },
+  deviceText: { flex: 1 },
+  deviceName: { ...IOS_TYPOGRAPHY.body, color: '#111111' },
+  deviceSub: { ...IOS_TYPOGRAPHY.footnote, color: '#6B7280', marginTop: 2 },
+  settingRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#E5E7EB' },
+  settingInfo: { flex: 1, marginRight: 12 },
+  settingLabel: { ...IOS_TYPOGRAPHY.body, color: '#111111' },
+  settingDesc: { ...IOS_TYPOGRAPHY.footnote, color: '#6B7280', marginTop: 2 },
+  unitToggle: { flexDirection: 'row', backgroundColor: '#F3F4F6', borderRadius: 50, padding: 2 },
+  unitButton: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 50 },
+  unitActive: { backgroundColor: '#FFFFFF', shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.1, shadowRadius: 2, elevation: 1 },
+  unitText: { ...IOS_TYPOGRAPHY.callout, fontWeight: '600', color: '#9CA3AF' },
+  unitActiveText: { color: '#22C55E' },
+  logoutButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: '#EF4444', borderRadius: 50, paddingVertical: 16, shadowColor: '#EF4444', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 4 },
+  logoutButtonText: { color: '#FFFFFF', ...IOS_TYPOGRAPHY.headline },
 });

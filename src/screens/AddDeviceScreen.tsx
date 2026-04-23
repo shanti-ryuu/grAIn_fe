@@ -15,11 +15,13 @@ import * as Haptics from 'expo-haptics';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { grainApi } from '@/api';
+import { useAppContext } from '@/context/AppContext';
 import { Header } from '@/components';
 import { GRADIENTS, IOS_TYPOGRAPHY } from '@/utils/constants';
 
 export default function AddDeviceScreen() {
   const router = useRouter();
+  const { showToast } = useAppContext();
   const [deviceId, setDeviceId] = useState('');
   const [location, setLocation] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -41,8 +43,9 @@ export default function AddDeviceScreen() {
     setIsSubmitting(true);
 
     try {
-      await grainApi.devices.register(trimmedId, trimmedLocation);
+      await grainApi.devices.register(trimmedId.toUpperCase(), trimmedLocation);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      showToast('Device added successfully', 'success');
       router.back();
     } catch (err: any) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);

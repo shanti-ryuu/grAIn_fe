@@ -1,0 +1,350 @@
+import React, { useState, useEffect, useCallback } from 'react';
+import {
+  View,
+  Text,
+  ScrollView,
+  RefreshControl,
+  StyleSheet,
+  ActivityIndicator,
+  Dimensions,
+  TouchableOpacity,
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { StatusBar } from 'expo-status-bar';
+import { LinearGradient } from 'expo-linear-gradient';
+import * as Haptics from 'expo-haptics';
+import { Ionicons } from '@expo/vector-icons';
+import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
+import { LineChart } from 'react-native-chart-kit';
+import { Header, Navigation } from '@/components';
+import { grainApi } from '@/api';
+import { useAppContext } from '@/context/AppContext';
+import { useAIPrediction, runPrediction } from '@/hooks/useAIPrediction';
+import type { SensorInput, AIPrediction } from '@/hooks/useAIPrediction';
+import { GRADIENTS, IOS_TYPOGRAPHY } from '@/utils/constants';
+
+const screenWidth = Dimensions.get('window').width - 48;
+
+const chartConfig = {
+  backgroundColor: '#FFFFFF',
+  backgroundGradientFrom: '#FFFFFF',
+  backgroundGradientTo: '#FFFFFF',
+  fillShadowGradient: '#22C55E',
+  fillShadowGradientOpacity: 0.15,
+  decimalPlaces: 1,
+  color: (opacity: number = 1) => `rgba(34, 197, 94, ${opacity})`,
+  labelColor: (opacity: number = 1) => `rgba(107, 114, 128, ${opacity})`,
+  style: { borderRadius: 16 },
+  propsForDots: { r: '4', strokeWidth: '2', stroke: '#22C55E' },
+};
+
+export default function AIPredictionScreen() {
+  const [isLoading, setIsLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [prediction, setPrediction] = useState<AIPrediction | null>(null);
+  const { showToast } = useAppContext();
+
+  const fetchPrediction = useCallback(async () => {
+    try {
+      // Try server-side prediction first
+      const devices = await grainApi.devices.list();
+      if (devices && devices.length > 0) {
+        const device = devices[0];
+        const latest = await grainApi.sensors.getLatestData(device.deviceId);
+        if (latest) {
+          const input: SensorInput = {
+            temperature: latest.temperature ?? 45,
+            humidity: latest.humidity ?? 50,
+            moisture: latest.moisture ?? 20,
+            fanSpeed: latest.fanSpeed ?? 70,
+            timeElapsed: 60,
+          };
+          // Try API, fall back to client-side
+          try {
+            const result = await grainApi.ai.predict(device.deviceId, input);
+            setPrediction({
+              predictedMoisture30min: result.predictedMoisture30min,
+              estimatedMinutesToTarget: result.estimatedMinutesToTarget,
+              recommendation: result.recommendation,
+              recommendationType: result.recommendationType,
+              efficiencyScore: result.efficiencyScore,
+              confidence: result.confidence,
+              isDryingComplete: result.isDryingComplete,
+              projectedMoistureCurve: result.projectedCurve,
+            });
+          } catch {
+            // Server unavailable — use client-side prediction
+            setPrediction(runPrediction(input));
+          }
+        } else {
+          // No sensor data — use demo input
+          setPrediction(runPrediction({ temperature: 45, humidity: 50, moisture: 20, fanSpeed: 70, timeElapsed: 60 }));
+        }
+      } else {
+        setPrediction(runPrediction({ temperature: 45, humidity: 50, moisture: 20, fanSpeed: 70, timeElapsed: 60 }));
+      }
+    } catch {
+      // Complete fallback — client-side demo
+      setPrediction(runPrediction({ temperature: 45, humidity: 50, moisture: 20, fanSpeed: 70, timeElapsed: 60 }));
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchPrediction();
+  }, [fetchPrediction]);
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    await fetchPrediction();
+    setRefreshing(false);
+    showToast('AI predictions refreshed', 'success');
+  }, [fetchPrediction, showToast]);
+
+  const formatTime = (minutes: number): string => {
+    if (!isFinite(minutes) || minutes <= 0) return 'Complete';
+    const h = Math.floor(minutes / 60);
+    const m = minutes % 60;
+    return h > 0 ? `${h}h ${m}m` : `${m}m`;
+  };
+
+  const getMoistureColor = (moisture: number): string => {
+    if (moisture > 20) return '#F97316';
+    if (moisture > 14) return '#FBBF24';
+    return '#22C55E';
+  };
+
+  const getRecommendationStyle = (type: 'optimal' | 'warning' | 'critical') => {
+    switch (type) {
+      case 'critical': return { bg: '#FEE2E2', border: '#EF4444', icon: 'alert-circle' as const, text: '#DC2626' };
+      case 'warning': return { bg: '#FEF9C3', border: '#F59E0B', icon: 'warning' as const, text: '#D97706' };
+      default: return { bg: '#DCFCE7', border: '#22C55E', icon: 'checkmark-circle' as const, text: '#16A34A' };
+    }
+  };
+
+  const recStyle = prediction ? getRecommendationStyle(prediction.recommendationType) : getRecommendationStyle('optimal');
+
+  // Build chart data from projected curve
+  const curveChartData = prediction?.projectedMoistureCurve
+    ? {
+        labels: prediction.projectedMoistureCurve.map((p) => `${p.time}`),
+        datasets: [
+          {
+            data: prediction.projectedMoistureCurve.map((p) => Math.max(0.1, p.moisture)),
+            color: (opacity: number = 1) => `rgba(249, 115, 22, ${opacity})`,
+          },
+        ],
+      }
+    : {
+        labels: ['0', '30', '60', '90', '120', '150', '180'],
+        datasets: [{ data: [20, 18, 16.5, 15.2, 14.1, 13.2, 12.5] }],
+      };
+
+  return (
+    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+      <StatusBar style="dark" />
+      <LinearGradient colors={GRADIENTS.analytics} style={styles.gradient}>
+        <Header />
+        <Animated.View entering={FadeIn.duration(200)} exiting={FadeOut.duration(150)} style={{ flex: 1 }}>
+          <ScrollView
+            style={styles.scrollView}
+            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#22C55E" />}
+            contentContainerStyle={styles.scrollContent}
+          >
+            <View style={styles.titleRow}>
+              <Ionicons name="sparkles" size={24} color="#22C55E" />
+              <Text style={styles.screenTitle}>AI Predictions</Text>
+            </View>
+            <Text style={styles.screenSubtitle}>AI-Assisted drying optimization</Text>
+
+            {isLoading ? (
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator size="large" color="#22C55E" />
+                <Text style={styles.loadingText}>Analyzing drying data...</Text>
+              </View>
+            ) : prediction ? (
+              <>
+                {/* Card 1: Predicted Moisture */}
+                <View style={styles.card}>
+                  <View style={styles.cardHeader}>
+                    <Ionicons name="water-outline" size={20} color="#22C55E" />
+                    <Text style={styles.cardTitle}>Predicted Moisture (30 min)</Text>
+                  </View>
+                  <Text style={[styles.bigValue, { color: getMoistureColor(prediction.predictedMoisture30min) }]}>
+                    {prediction.predictedMoisture30min}%
+                  </Text>
+                  <View style={styles.progressRow}>
+                    <View style={styles.progressTrack}>
+                      <View style={[styles.progressFill, { width: `${Math.min(100, (1 - prediction.predictedMoisture30min / 30) * 100)}%`, backgroundColor: getMoistureColor(prediction.predictedMoisture30min) }]} />
+                    </View>
+                  </View>
+                  <View style={styles.progressLabels}>
+                    <Text style={styles.progressLabel}>Current → Predicted → 14% Target</Text>
+                  </View>
+                  <Text style={styles.cardSubtext}>Based on current drying trend</Text>
+                </View>
+
+                {/* Card 2: Estimated Time */}
+                <View style={styles.card}>
+                  <View style={styles.cardHeader}>
+                    <Ionicons name="time-outline" size={20} color="#22C55E" />
+                    <Text style={styles.cardTitle}>Est. Time to Target</Text>
+                  </View>
+                  {prediction.isDryingComplete ? (
+                    <View style={styles.completeRow}>
+                      <Ionicons name="checkmark-circle" size={28} color="#22C55E" />
+                      <Text style={styles.completeText}>Drying Complete</Text>
+                    </View>
+                  ) : (
+                    <Text style={styles.countdownValue}>{formatTime(prediction.estimatedMinutesToTarget)}</Text>
+                  )}
+                  <Text style={styles.cardSubtext}>Target: 14% moisture for safe storage</Text>
+                </View>
+
+                {/* Card 3: AI Recommendation */}
+                <View style={[styles.card, { backgroundColor: recStyle.bg, borderColor: recStyle.border, borderWidth: 1.5 }]}>
+                  <View style={styles.cardHeader}>
+                    <Ionicons name={recStyle.icon} size={20} color={recStyle.text} />
+                    <Text style={[styles.cardTitle, { color: recStyle.text }]}>AI Recommendation</Text>
+                  </View>
+                  <Text style={[styles.recommendationText, { color: recStyle.text }]}>
+                    {prediction.recommendation}
+                  </Text>
+                  <View style={styles.aiLabel}>
+                    <Ionicons name="sparkles-outline" size={12} color={recStyle.text} />
+                    <Text style={[styles.aiLabelText, { color: recStyle.text }]}>AI-Assisted</Text>
+                  </View>
+                </View>
+
+                {/* Card 4: Efficiency Score */}
+                <View style={styles.card}>
+                  <View style={styles.cardHeader}>
+                    <Ionicons name="speedometer-outline" size={20} color="#22C55E" />
+                    <Text style={styles.cardTitle}>Drying Efficiency</Text>
+                  </View>
+                  <View style={styles.scoreRow}>
+                    <View style={styles.circularProgress}>
+                      <View style={[styles.circularFill, { height: `${prediction.efficiencyScore}%`, backgroundColor: prediction.efficiencyScore >= 70 ? '#22C55E' : prediction.efficiencyScore >= 40 ? '#FBBF24' : '#EF4444' }]} />
+                    </View>
+                    <Text style={styles.scoreValue}>{prediction.efficiencyScore}%</Text>
+                  </View>
+                  <Text style={styles.cardSubtext}>
+                    {prediction.efficiencyScore >= 80 ? 'Excellent drying conditions' :
+                     prediction.efficiencyScore >= 60 ? 'Good drying conditions detected' :
+                     prediction.efficiencyScore >= 40 ? 'Fair conditions — consider adjustments' :
+                     'Poor conditions — action needed'}
+                  </Text>
+                </View>
+
+                {/* Card 5: Confidence */}
+                <View style={styles.card}>
+                  <View style={styles.cardHeader}>
+                    <Ionicons name="shield-checkmark-outline" size={20} color="#22C55E" />
+                    <Text style={styles.cardTitle}>Model Confidence</Text>
+                  </View>
+                  <Text style={styles.confidenceValue}>{prediction.confidence}%</Text>
+                  <View style={styles.confidenceTrack}>
+                    <View style={[styles.confidenceFill, { width: `${prediction.confidence}%`, backgroundColor: prediction.confidence >= 80 ? '#22C55E' : prediction.confidence >= 60 ? '#FBBF24' : '#EF4444' }]} />
+                  </View>
+                  <Text style={styles.cardSubtext}>
+                    {prediction.confidence >= 80 ? 'High — readings are consistent' :
+                     prediction.confidence >= 60 ? 'Moderate — some variation detected' :
+                     'Low — sensor readings inconsistent'}
+                  </Text>
+                </View>
+
+                {/* Card 6: Moisture Trend Chart */}
+                <View style={styles.card}>
+                  <View style={styles.cardHeader}>
+                    <Ionicons name="trending-down-outline" size={20} color="#22C55E" />
+                    <Text style={styles.cardTitle}>Projected Moisture Curve</Text>
+                  </View>
+                  <LineChart
+                    data={curveChartData}
+                    width={screenWidth}
+                    height={200}
+                    chartConfig={{
+                      ...chartConfig,
+                      color: (opacity: number = 1) => `rgba(249, 115, 22, ${opacity})`,
+                    }}
+                    bezier
+                    style={styles.chart}
+                  />
+                  <View style={styles.targetLine}>
+                    <View style={styles.targetDash} />
+                    <Text style={styles.targetLabel}>14% Safe Storage Level</Text>
+                  </View>
+                  <View style={styles.aiLabel}>
+                    <Ionicons name="sparkles-outline" size={12} color="#6B7280" />
+                    <Text style={styles.aiLabelText}>AI-Assisted Projection</Text>
+                  </View>
+                </View>
+              </>
+            ) : (
+              <View style={styles.loadingContainer}>
+                <Ionicons name="sparkles-outline" size={48} color="#6B7280" />
+                <Text style={styles.loadingText}>No prediction data available</Text>
+              </View>
+            )}
+          </ScrollView>
+        </Animated.View>
+        <Navigation />
+      </LinearGradient>
+    </SafeAreaView>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: { flex: 1 },
+  gradient: { flex: 1 },
+  scrollView: { flex: 1 },
+  scrollContent: { padding: 16, paddingBottom: 72, gap: 12 },
+  titleRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  screenTitle: { ...IOS_TYPOGRAPHY.largeTitle, color: '#111111' },
+  screenSubtitle: { ...IOS_TYPOGRAPHY.footnote, color: '#6B7280', marginBottom: 4 },
+  card: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 20,
+    gap: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  cardHeader: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  cardTitle: { ...IOS_TYPOGRAPHY.headline, color: '#111111' },
+  cardSubtext: { ...IOS_TYPOGRAPHY.caption1, color: '#6B7280' },
+  bigValue: { fontSize: 36, fontWeight: '700' },
+  progressRow: { marginVertical: 4 },
+  progressTrack: { height: 10, backgroundColor: '#E5E7EB', borderRadius: 5, overflow: 'hidden' },
+  progressFill: { height: '100%', borderRadius: 5 },
+  progressLabels: { flexDirection: 'row', justifyContent: 'space-between' },
+  progressLabel: { ...IOS_TYPOGRAPHY.caption2, color: '#9CA3AF' },
+  countdownValue: { fontSize: 40, fontWeight: '700', color: '#111111' },
+  completeRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  completeText: { fontSize: 24, fontWeight: '700', color: '#22C55E' },
+  recommendationText: { fontSize: 15, fontWeight: '500', lineHeight: 22 },
+  aiLabel: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 },
+  aiLabelText: { ...IOS_TYPOGRAPHY.caption2, color: '#6B7280', fontWeight: '600' },
+  scoreRow: { flexDirection: 'row', alignItems: 'center', gap: 16 },
+  circularProgress: {
+    width: 60, height: 60, borderRadius: 30,
+    backgroundColor: '#E5E7EB', overflow: 'hidden',
+    justifyContent: 'flex-end',
+  },
+  circularFill: { width: '100%', borderRadius: 30 },
+  scoreValue: { fontSize: 32, fontWeight: '700', color: '#111111' },
+  confidenceValue: { fontSize: 28, fontWeight: '700', color: '#111111' },
+  confidenceTrack: { height: 8, backgroundColor: '#E5E7EB', borderRadius: 4, overflow: 'hidden', marginVertical: 4 },
+  confidenceFill: { height: '100%', borderRadius: 4 },
+  chart: { borderRadius: 16 },
+  targetLine: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8 },
+  targetDash: { flex: 1, height: 1, backgroundColor: '#EF4444', borderStyle: 'dashed' },
+  targetLabel: { ...IOS_TYPOGRAPHY.caption2, color: '#EF4444', fontWeight: '600' },
+  loadingContainer: { paddingVertical: 48, alignItems: 'center', gap: 12 },
+  loadingText: { ...IOS_TYPOGRAPHY.footnote, color: '#6B7280' },
+});

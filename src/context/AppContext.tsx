@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useCallback } from 'react';
 import { grainApi } from '@/api';
-import type { User } from '@/api';
+import type { User, Device, AlertItem } from '@/api';
 import { useAuth } from '@/hooks';
 
 interface ToastState {
@@ -11,8 +11,8 @@ interface ToastState {
 
 interface AppContextType {
   user: User | null;
-  alerts: any[];
-  devices: any[];
+  alerts: AlertItem[];
+  devices: Device[];
   settings: any;
   isLoading: boolean;
   toast: ToastState;
@@ -38,8 +38,8 @@ const AppContext = createContext<AppContextType>({
 export function AppProvider({ children }: { children: React.ReactNode }) {
   const { logout: authLogout } = useAuth();
   const [user, setUser] = useState<User | null>(null);
-  const [alerts, setAlerts] = useState<any[]>([]);
-  const [devices, setDevices] = useState<any[]>([]);
+  const [alerts, setAlerts] = useState<AlertItem[]>([]);
+  const [devices, setDevices] = useState<Device[]>([]);
   const [settings, setSettings] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [toast, setToast] = useState<ToastState>({ message: '', type: 'info', visible: false });

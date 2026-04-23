@@ -66,6 +66,17 @@ export interface AnalyticsOverview {
   energyConsumption: { label: string; value: number }[]
 }
 
+export interface AIPredictionResponse {
+  predictedMoisture30min: number
+  estimatedMinutesToTarget: number
+  recommendation: string
+  recommendationType: 'optimal' | 'warning' | 'critical'
+  efficiencyScore: number
+  confidence: number
+  isDryingComplete: boolean
+  projectedCurve: { time: number; moisture: number }[]
+}
+
 export interface PaginatedResponse<T> {
   data: T[]
   pagination: {
@@ -374,6 +385,31 @@ class GrainApiClient {
         return response.data.data
       }
       throw new Error('Invalid analytics response')
+    },
+  }
+
+  // ─── AI ────────────────────────────────────────────────────
+
+  ai = {
+    predict: async (
+      deviceId: string,
+      sensorData: {
+        temperature: number
+        humidity: number
+        moisture: number
+        fanSpeed: number
+        timeElapsed: number
+        solarVoltage?: number
+      },
+    ): Promise<AIPredictionResponse> => {
+      const response = await this.client.post<ApiResponse<AIPredictionResponse>>(
+        '/ai/predict',
+        { deviceId, ...sensorData },
+      )
+      if (response.data.data) {
+        return response.data.data
+      }
+      throw new Error('Invalid AI prediction response')
     },
   }
 

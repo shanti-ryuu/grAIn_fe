@@ -11,14 +11,15 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import { ref, onValue, off } from 'firebase/database';
 import { db } from '@/lib/firebase';
 import { useDevices } from '@/hooks';
-import { Header, Navigation, StatusBadge, LoadingSkeleton } from '@/components';
+import { Header, Navigation, StatusBadge } from '@/components';
 import { GRADIENTS, IOS_TYPOGRAPHY } from '@/utils/constants';
+import { analyzeDryingStatus } from '@/utils/dryingAlerts';
 import type { Device } from '@/api';
 
 function SkeletonDeviceCards() {
@@ -49,6 +50,13 @@ export default function DashboardScreen() {
   useEffect(() => {
     setDevices(apiDevices);
   }, [apiDevices]);
+
+  // Refetch on screen focus
+  useFocusEffect(
+    useCallback(() => {
+      refetch();
+    }, [refetch])
+  );
 
   // Subscribe to Firebase realtime device statuses
   useEffect(() => {
@@ -95,7 +103,38 @@ export default function DashboardScreen() {
             refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#22C55E" />}
             contentContainerStyle={styles.scrollContent}
           >
-            <Text style={styles.sectionTitle}>Your Devices</Text>
+            {/* Drying Alert Banner */}
+            {devices.some(d => d.status === 'online') && (
+              (() => {
+                const alert = analyzeDryingStatus(20, 14, 45);
+                const alertColors: Record<string, { bg: string; border: string; text: string; icon: string }> = {
+                  critical: { bg: '#FEE2E2', border: '#EF4444', text: '#DC2626', icon: 'alert-circle' },
+                  warning: { bg: '#FEF9C3', border: '#F59E0B', text: '#D97706', icon: 'warning' },
+                  info: { bg: '#EFF6FF', border: '#3B82F6', text: '#2563EB', icon: 'information-circle' },
+                };
+                const c = alertColors[alert.severity] || alertColors.info;
+                return (
+                  <View style={[styles.dryingAlertBanner, { backgroundColor: c.bg, borderColor: c.border }]}>
+                    <Ionicons name={c.icon as any} size={20} color={c.text} />
+                    <View style={styles.dryingAlertContent}>
+                      <Text style={[styles.dryingAlertMsg, { color: c.text }]}>{alert.message}</Text>
+                      <Text style={styles.dryingAlertAction}>{alert.action}</Text>
+                    </View>
+                  </View>
+                );
+              })()
+            )}
+
+            <View style={styles.titleRow}>
+              <Text style={styles.sectionTitle}>Your Devices</Text>
+              <TouchableOpacity
+                style={styles.addButton}
+                onPress={handleAddDevice}
+                activeOpacity={0.7}
+              >
+                <Ionicons name="add" size={22} color="#FFFFFF" />
+              </TouchableOpacity>
+            </View>
 
             {isLoading && devices.length === 0 ? (
               <SkeletonDeviceCards />
@@ -160,10 +199,28 @@ const styles = StyleSheet.create({
     padding: 16,
     paddingBottom: 72,
   },
+  titleRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
   sectionTitle: {
     ...IOS_TYPOGRAPHY.largeTitle,
     color: '#111111',
-    marginBottom: 16,
+  },
+  addButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#22C55E',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#22C55E',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    elevation: 3,
   },
   deviceCard: {
     flexDirection: 'row',
@@ -275,5 +332,26 @@ const styles = StyleSheet.create({
     height: 24,
     backgroundColor: '#E5E7EB',
     borderRadius: 12,
+  },
+  dryingAlertBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    borderRadius: 16,
+    padding: 14,
+    borderWidth: 1.5,
+    marginBottom: 4,
+  },
+  dryingAlertContent: {
+    flex: 1,
+    gap: 2,
+  },
+  dryingAlertMsg: {
+    ...IOS_TYPOGRAPHY.footnote,
+    fontWeight: '600',
+  },
+  dryingAlertAction: {
+    ...IOS_TYPOGRAPHY.caption1,
+    color: '#6B7280',
   },
 });

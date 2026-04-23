@@ -69,7 +69,7 @@ export default function SignupScreen() {
     try {
       const { user } = await grainApi.auth.register(name.trim(), email.trim(), password.trim());
       await login(email.trim(), password.trim());
-      router.replace('/(app)');
+      router.replace('/(app)/dashboard');
     } catch (err: any) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       const message = err?.message || 'Registration failed. Please try again.';

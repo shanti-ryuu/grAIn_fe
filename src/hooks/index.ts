@@ -3,3 +3,4 @@ export { useDevice } from './useDevice';
 export { useDevices } from './useDevices';
 export { useSensorData } from './useSensorData';
 export { useRealtimeSensor } from './useRealtimeSensor';
+export { useAIPrediction, runPrediction } from './useAIPrediction';

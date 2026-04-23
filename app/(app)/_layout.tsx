@@ -1,6 +1,5 @@
-import { Stack } from 'expo-router';
-import { useAuth } from '@/hooks';
-import { Redirect } from 'expo-router';
+import { Stack, Redirect } from 'expo-router';
+import { useAuth } from '@/context/AuthContext';
 import { View, ActivityIndicator } from 'react-native';
 
 export default function AppLayout() {
@@ -9,7 +8,7 @@ export default function AppLayout() {
   if (isLoading) {
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-        <ActivityIndicator size="large" color="#2E7D32" />
+        <ActivityIndicator size="large" color="#22C55E" />
       </View>
     );
   }
@@ -22,8 +21,9 @@ export default function AppLayout() {
     <Stack screenOptions={{ headerShown: false, animation: 'slide_from_right' }}>
       <Stack.Screen name="dashboard" />
       <Stack.Screen name="control" />
-      <Stack.Screen name="alerts" />
       <Stack.Screen name="analytics" />
+      <Stack.Screen name="ai-prediction" />
+      <Stack.Screen name="alerts" />
       <Stack.Screen name="settings" />
       <Stack.Screen name="device/[id]" />
       <Stack.Screen name="add-device" options={{ animation: 'slide_from_right' }} />

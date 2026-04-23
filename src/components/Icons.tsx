@@ -11,7 +11,7 @@ export function DashboardIcon({ size = 24, color = '#1c1c1e' }: IconProps) {
 }
 
 export function ControlIcon({ size = 24, color = '#1c1c1e' }: IconProps) {
-  return <Ionicons name="person-outline" size={size} color={color} />;
+  return <Ionicons name="hardware-chip-outline" size={size} color={color} />;
 }
 
 export function AnalyticsIcon({ size = 24, color = '#1c1c1e' }: IconProps) {
