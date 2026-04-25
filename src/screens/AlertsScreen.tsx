@@ -41,6 +41,7 @@ const FILTER_CONFIG: { key: FilterType; label: string; color: string; activeBg: 
 
 export default function AlertsScreen() {
   const [alerts, setAlerts] = useState<AlertEntry[]>([]);
+  const [unreadIds, setUnreadIds] = useState<Set<string | number>>(new Set());
   const [isLoading, setIsLoading] = useState(true);
   const [filter, setFilter] = useState<FilterType>('all');
   const [refreshing, setRefreshing] = useState(false);
@@ -81,13 +82,16 @@ export default function AlertsScreen() {
   const fetchAlerts = useCallback(async () => {
     try {
       const data = await grainApi.alerts.getAll();
-      setAlerts(data.map((a) => ({
+      const mapped = data.map((a) => ({
         id: a._id,
         severity: a.severity,
         title: a.title,
         message: a.message,
         timestamp: a.timestamp,
-      })));
+      }));
+      setAlerts(mapped);
+      // Mark all new alerts as unread
+      setUnreadIds(new Set(mapped.map((a) => a.id)));
     } catch (err: any) {
       Alert.alert('Error', err?.message || 'Failed to fetch alerts');
       setAlerts([]);
@@ -107,7 +111,18 @@ export default function AlertsScreen() {
   }, [fetchAlerts]);
 
   const handleDismiss = (id: string | number) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setAlerts((prev) => prev.filter((a) => a.id !== id));
+    setUnreadIds((prev) => { const next = new Set(prev); next.delete(id); return next; });
+  };
+
+  const handleMarkRead = (id: string | number) => {
+    setUnreadIds((prev) => { const next = new Set(prev); next.delete(id); return next; });
+  };
+
+  const handleMarkAllRead = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setUnreadIds(new Set());
   };
 
   const handleClearAll = async () => {
@@ -136,11 +151,18 @@ export default function AlertsScreen() {
           <View style={styles.titleRow}>
             <View>
               <Text style={styles.screenTitle}>Alerts</Text>
-              <Text style={styles.alertCount}>{alerts.length} alerts</Text>
+              <Text style={styles.alertCount}>{alerts.length} alerts{unreadIds.size > 0 ? ` · ${unreadIds.size} unread` : ''}</Text>
             </View>
-            <TouchableOpacity style={styles.clearAllButton} onPress={handleClearAll} activeOpacity={0.7}>
-              <Text style={styles.clearAllText}>Clear All</Text>
-            </TouchableOpacity>
+            <View style={styles.titleActions}>
+              {unreadIds.size > 0 && (
+                <TouchableOpacity style={styles.markReadButton} onPress={handleMarkAllRead} activeOpacity={0.7}>
+                  <Text style={styles.markReadText}>Mark All Read</Text>
+                </TouchableOpacity>
+              )}
+              <TouchableOpacity style={styles.clearAllButton} onPress={handleClearAll} activeOpacity={0.7}>
+                <Text style={styles.clearAllText}>Clear All</Text>
+              </TouchableOpacity>
+            </View>
           </View>
 
           <View style={styles.filterRow}>
@@ -170,7 +192,11 @@ export default function AlertsScreen() {
             </View>
           ) : (
             filteredAlerts.map((alert: any) => (
-              <AlertCard key={alert.id} alert={alert} onDismiss={handleDismiss} />
+              <TouchableOpacity key={alert.id} onPress={() => handleMarkRead(alert.id)} activeOpacity={0.8}>
+                <View style={unreadIds.has(alert.id) && styles.unreadHighlight}>
+                  <AlertCard alert={alert} onDismiss={handleDismiss} />
+                </View>
+              </TouchableOpacity>
             ))
           )}
 
@@ -254,6 +280,22 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     marginTop: 2,
   },
+  titleActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  markReadButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 50,
+    backgroundColor: '#EFF6FF',
+  },
+  markReadText: {
+    ...IOS_TYPOGRAPHY.caption1,
+    fontWeight: '600',
+    color: '#3B82F6',
+  },
   clearAllButton: {
     paddingHorizontal: 16,
     paddingVertical: 8,
@@ -266,6 +308,12 @@ const styles = StyleSheet.create({
     ...IOS_TYPOGRAPHY.footnote,
     fontWeight: '600',
     color: '#22C55E',
+  },
+  unreadHighlight: {
+    backgroundColor: '#F0FDF4',
+    borderRadius: 16,
+    borderLeftWidth: 3,
+    borderLeftColor: '#22C55E',
   },
   filterRow: {
     flexDirection: 'row',

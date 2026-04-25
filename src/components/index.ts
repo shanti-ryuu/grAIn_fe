@@ -1,4 +1,5 @@
 export { default as AlertCard } from './AlertCard';
+export { default as ConnectionBanner } from './ConnectionBanner';
 export { default as Button } from './Button';
 export { default as GlobalToast } from './GlobalToast';
 export { default as Card } from './Card';

@@ -126,3 +126,15 @@ export const DEFAULT_SETTINGS = {
   autoStart: false,
   maintenanceReminder: true,
 };
+
+export const SENSOR_THRESHOLDS = {
+  TARGET_MOISTURE: 14,
+  MIN_MOISTURE: 10,
+  OPT_TEMP_MIN: 40,
+  OPT_TEMP_MAX: 60,
+  OPT_HUMIDITY_MAX: 60,
+  OPT_FAN_MIN: 70,
+  OPT_FAN_MAX: 90,
+  CRITICAL_TEMP_MAX: 80,
+  CRITICAL_HUMIDITY_MAX: 80,
+};

@@ -12,21 +12,23 @@ interface ToastProps {
   onHide?: () => void;
 }
 
-const TYPE_CONFIG: Record<string, { bg: string; text: string; icon: IoniconName }> = {
-  success: { bg: '#D1FAE5', text: '#059669', icon: 'checkmark-circle' },
-  error: { bg: '#FEE2E2', text: '#DC2626', icon: 'close-circle' },
-  info: { bg: '#DBEAFE', text: '#2563EB', icon: 'information-circle' },
-  warning: { bg: '#FEF3C7', text: '#D97706', icon: 'warning' },
+const TYPE_CONFIG: Record<string, { bg: string; text: string; icon: IoniconName; duration: number }> = {
+  success: { bg: '#D1FAE5', text: '#059669', icon: 'checkmark-circle', duration: 2500 },
+  error: { bg: '#FEE2E2', text: '#DC2626', icon: 'close-circle', duration: 5000 },
+  info: { bg: '#DBEAFE', text: '#2563EB', icon: 'information-circle', duration: 3000 },
+  warning: { bg: '#FEF3C7', text: '#D97706', icon: 'warning', duration: 4000 },
 };
 
 export default function Toast({
   message = '',
   type = 'info',
   visible = false,
-  duration = 3000,
+  duration,
   onHide,
 }: ToastProps) {
   const opacity = useRef(new Animated.Value(0)).current;
+  const config = TYPE_CONFIG[type] || TYPE_CONFIG.info;
+  const autoDismiss = duration ?? config.duration;
 
   useEffect(() => {
     if (visible) {
@@ -42,15 +44,13 @@ export default function Toast({
           duration: 300,
           useNativeDriver: true,
         }).start(() => onHide?.());
-      }, duration);
+      }, autoDismiss);
 
       return () => clearTimeout(timer);
     }
   }, [visible]);
 
   if (!visible) return null;
-
-  const config = TYPE_CONFIG[type] || TYPE_CONFIG.info;
 
   return (
     <Animated.View style={[styles.container, { backgroundColor: config.bg, opacity }]}>
@@ -62,18 +62,21 @@ export default function Toast({
 
 const styles = StyleSheet.create({
   container: {
+    position: 'absolute',
+    top: 60,
+    left: 16,
+    right: 16,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
     padding: 12,
     borderRadius: 16,
-    marginHorizontal: 16,
-    marginVertical: 8,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 8,
     elevation: 4,
+    zIndex: 9999,
   },
   message: {
     flex: 1,

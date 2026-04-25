@@ -14,6 +14,7 @@ import { StatusBadge, Header, Navigation, GrainDryingSimulation, ProgressBar } f
 import { grainApi } from '@/api';
 import { useAppContext } from '@/context/AppContext';
 import { GRADIENTS, IOS_TYPOGRAPHY } from '@/utils/constants';
+import { analyzeDryingStatus } from '@/utils/dryingAlerts';
 
 interface DeviceDetailScreenProps { deviceId?: string; }
 
@@ -53,28 +54,58 @@ export default function DeviceDetailScreen({ deviceId }: DeviceDetailScreenProps
   const liveData = rtData || polledData;
   const fbConnected = rtData !== null;
 
+  const [commandHistory, setCommandHistory] = useState<{ action: string; time: string }[]>([]);
+
+  const addCommand = (action: string) => {
+    setCommandHistory(prev => [{ action, time: new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) }, ...prev].slice(0, 10));
+  };
+
   const handleStartDryer = async () => {
     if (!deviceId) return;
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    setIsControlling(true);
-    try {
-      await grainApi.dryer.start(deviceId, 'auto');
-      showToast('Dryer started successfully', 'success');
-    } catch (err: any) {
-      Alert.alert('Error', err?.message || 'Failed to start dryer');
-    } finally { setIsControlling(false); }
+    Alert.alert('Start Dryer', `Start drying cycle for ${device?.name || deviceId}?`, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Start',
+        style: 'default',
+        onPress: async () => {
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+          setIsControlling(true);
+          try {
+            await grainApi.dryer.start(deviceId, 'auto');
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+            showToast('Dryer started successfully', 'success');
+            addCommand('START (auto)');
+          } catch (err: any) {
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+            showToast(err?.message || 'Failed to start dryer', 'error');
+          } finally { setIsControlling(false); }
+        },
+      },
+    ]);
   };
 
   const handleStopDryer = async () => {
     if (!deviceId) return;
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-    setIsControlling(true);
-    try {
-      await grainApi.dryer.stop(deviceId);
-      showToast('Dryer stopped successfully', 'success');
-    } catch (err: any) {
-      Alert.alert('Error', err?.message || 'Failed to stop dryer');
-    } finally { setIsControlling(false); }
+    Alert.alert('Stop Dryer', `Stop drying cycle for ${device?.name || deviceId}?`, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Stop',
+        style: 'destructive',
+        onPress: async () => {
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+          setIsControlling(true);
+          try {
+            await grainApi.dryer.stop(deviceId);
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+            showToast('Dryer stopped successfully', 'success');
+            addCommand('STOP');
+          } catch (err: any) {
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+            showToast(err?.message || 'Failed to stop dryer', 'error');
+          } finally { setIsControlling(false); }
+        },
+      },
+    ]);
   };
 
   if (deviceLoading) {
@@ -145,6 +176,27 @@ export default function DeviceDetailScreen({ deviceId }: DeviceDetailScreenProps
 
           <Text style={s.lastUpd}>Last updated: {fmtUpdated(lastUpdated)}{!fbConnected && polledData ? ' (polling)' : ''}</Text>
 
+          {/* Drying Alert Banner */}
+          {(() => {
+            const alert = analyzeDryingStatus(moisture, targetM, temp);
+            if (alert.type === 'normal') return null;
+            const alertColors: Record<string, { bg: string; border: string; text: string; icon: string }> = {
+              critical: { bg: '#FEE2E2', border: '#EF4444', text: '#DC2626', icon: 'alert-circle' },
+              warning: { bg: '#FEF9C3', border: '#F59E0B', text: '#D97706', icon: 'warning' },
+              info: { bg: '#EFF6FF', border: '#3B82F6', text: '#2563EB', icon: 'information-circle' },
+            };
+            const c = alertColors[alert.severity] || alertColors.info;
+            return (
+              <View style={[s.dryingAlertBanner, { backgroundColor: c.bg, borderColor: c.border }]}>
+                <Ionicons name={c.icon as any} size={20} color={c.text} />
+                <View style={s.dryingAlertContent}>
+                  <Text style={[s.dryingAlertMsg, { color: c.text }]}>{alert.message}</Text>
+                  <Text style={s.dryingAlertAction}>{alert.action}</Text>
+                </View>
+              </View>
+            );
+          })()}
+
           <GrainDryingSimulation moisture={moisture} temperature={temp} isRunning={isRunning} targetMoisture={targetM} />
 
           <View style={s.card}><ProgressBar progress={progress} timeRemaining={isRunning ? 'Estimating...' : '--'} showLabel={true} showTime={true} /></View>
@@ -169,6 +221,32 @@ export default function DeviceDetailScreen({ deviceId }: DeviceDetailScreenProps
             <Text style={s.aiInsightsTxt}>AI Insights</Text>
             <Ionicons name="chevron-forward" size={16} color="#9CA3AF" />
           </TouchableOpacity>
+
+          {/* Quick Actions */}
+          <View style={s.quickActions}>
+            <TouchableOpacity style={[s.actionBtn, { backgroundColor: '#22C55E' }]} onPress={handleStartDryer} disabled={isControlling || isRunning} activeOpacity={0.7}>
+              <Ionicons name="play-outline" size={18} color="#FFFFFF" />
+              <Text style={s.actionBtnTxt}>{isControlling ? 'Working...' : 'Start'}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[s.actionBtn, { backgroundColor: '#EF4444' }]} onPress={handleStopDryer} disabled={isControlling || !isRunning} activeOpacity={0.7}>
+              <Ionicons name="stop-outline" size={18} color="#FFFFFF" />
+              <Text style={s.actionBtnTxt}>Stop</Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Command History */}
+          {commandHistory.length > 0 && (
+            <View style={s.card}>
+              <Text style={s.cardLbl}>COMMAND HISTORY</Text>
+              {commandHistory.map((cmd, i) => (
+                <View key={i} style={s.cmdRow}>
+                  <Ionicons name={cmd.action.startsWith('START') ? 'play-circle-outline' : 'stop-circle-outline'} size={16} color={cmd.action.startsWith('START') ? '#22C55E' : '#EF4444'} />
+                  <Text style={s.cmdAction}>{cmd.action}</Text>
+                  <Text style={s.cmdTime}>{cmd.time}</Text>
+                </View>
+              ))}
+            </View>
+          )}
 
           <View style={s.bottomBanner}>
             <View style={s.bannerL}><View style={[s.bannerDot, { backgroundColor: isRunning ? '#22C55E' : '#9CA3AF' }]} /><Text style={s.bannerTxt}>{isRunning ? 'System Running' : 'System Idle'}</Text></View>
@@ -220,4 +298,14 @@ const s = StyleSheet.create({
   ctrlBtnTxt: { color: '#FFF', ...IOS_TYPOGRAPHY.callout, fontWeight: '600' },
   aiInsightsBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#F0FDF4', borderRadius: 16, padding: 14, borderWidth: 1.5, borderColor: '#22C55E' },
   aiInsightsTxt: { ...IOS_TYPOGRAPHY.callout, fontWeight: '600', color: '#16A34A', flex: 1, marginLeft: 8 },
+  quickActions: { flexDirection: 'row', gap: 12 },
+  actionBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderRadius: 50, paddingVertical: 14, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 8, elevation: 3 },
+  actionBtnTxt: { color: '#FFFFFF', ...IOS_TYPOGRAPHY.headline },
+  cmdRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: '#F3F4F6' },
+  cmdAction: { ...IOS_TYPOGRAPHY.footnote, color: '#111', flex: 1 },
+  cmdTime: { ...IOS_TYPOGRAPHY.caption2, color: '#9CA3AF' },
+  dryingAlertBanner: { flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: 16, padding: 14, borderWidth: 1.5 },
+  dryingAlertContent: { flex: 1, gap: 2 },
+  dryingAlertMsg: { ...IOS_TYPOGRAPHY.footnote, fontWeight: '600' },
+  dryingAlertAction: { ...IOS_TYPOGRAPHY.caption1, color: '#6B7280' },
 });

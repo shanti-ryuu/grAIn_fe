@@ -13,6 +13,10 @@ export interface User {
   name: string
   email: string
   role: 'farmer' | 'admin'
+  profileImage?: string | null
+  bio?: string
+  phoneNumber?: string
+  location?: string
 }
 
 export interface Device {
@@ -66,7 +70,7 @@ export interface AnalyticsOverview {
   energyConsumption: { label: string; value: number }[]
 }
 
-export interface AIPredictionResponse {
+export interface AIPrediction {
   predictedMoisture30min: number
   estimatedMinutesToTarget: number
   recommendation: string
@@ -75,6 +79,18 @@ export interface AIPredictionResponse {
   confidence: number
   isDryingComplete: boolean
   projectedCurve: { time: number; moisture: number }[]
+  targetMoisture: number
+  algorithm: string
+}
+
+export interface SensorInput {
+  deviceId: string
+  temperature: number
+  humidity: number
+  moisture: number
+  fanSpeed: number
+  timeElapsed: number
+  solarVoltage?: number
 }
 
 export interface PaginatedResponse<T> {
@@ -103,12 +119,13 @@ class GrainApiClient {
   private baseURL: string
 
   constructor(baseURL?: string) {
-    this.baseURL = baseURL || 'http://localhost:3000/api'
+    this.baseURL = baseURL || process.env.EXPO_PUBLIC_API_URL || 'https://grain-web-admin.onrender.com/api'
+    console.log(`[grainApi] baseURL: ${this.baseURL}`)
 
     this.client = axios.create({
       baseURL: this.baseURL,
       headers: { 'Content-Type': 'application/json' },
-      timeout: 15000,
+      timeout: 30000,
     })
 
     this.client.interceptors.request.use(
@@ -206,8 +223,10 @@ class GrainApiClient {
       throw new Error('Invalid register response')
     },
 
-    me: async (): Promise<User> => {
-      const response = await this.client.get<ApiResponse<{ user: User }>>('/auth/me')
+    me: async (timeoutMs?: number): Promise<User> => {
+      const response = await this.client.get<ApiResponse<{ user: User }>>('/auth/me', {
+        timeout: timeoutMs ?? undefined,
+      })
       if (response.data.data) {
         return response.data.data.user ?? response.data.data as any
       }
@@ -391,20 +410,10 @@ class GrainApiClient {
   // ─── AI ────────────────────────────────────────────────────
 
   ai = {
-    predict: async (
-      deviceId: string,
-      sensorData: {
-        temperature: number
-        humidity: number
-        moisture: number
-        fanSpeed: number
-        timeElapsed: number
-        solarVoltage?: number
-      },
-    ): Promise<AIPredictionResponse> => {
-      const response = await this.client.post<ApiResponse<AIPredictionResponse>>(
+    predict: async (params: SensorInput): Promise<AIPrediction> => {
+      const response = await this.client.post<ApiResponse<AIPrediction>>(
         '/ai/predict',
-        { deviceId, ...sensorData },
+        params,
       )
       if (response.data.data) {
         return response.data.data
@@ -413,12 +422,59 @@ class GrainApiClient {
     },
   }
 
+  // ─── Profile ────────────────────────────────────────────────
+
+  profile = {
+    get: async (): Promise<User> => {
+      const response = await this.client.get<ApiResponse<User>>('/users/profile')
+      if (response.data.data) {
+        return response.data.data
+      }
+      throw new Error('Invalid profile response')
+    },
+
+    update: async (data: {
+      name?: string
+      bio?: string
+      phoneNumber?: string
+      location?: string
+    }): Promise<User> => {
+      const response = await this.client.patch<ApiResponse<User>>('/users/profile', data)
+      if (response.data.data) {
+        return response.data.data
+      }
+      throw new Error('Invalid profile update response')
+    },
+
+    updateAvatar: async (base64: string): Promise<User> => {
+      const response = await this.client.post<ApiResponse<User>>(
+        '/users/profile/avatar',
+        { image: base64 },
+      )
+      if (response.data.data) {
+        return response.data.data
+      }
+      throw new Error('Invalid avatar update response')
+    },
+
+    changePassword: async (data: {
+      currentPassword: string
+      newPassword: string
+      confirmPassword: string
+    }): Promise<any> => {
+      const response = await this.client.post('/users/change-password', data)
+      return response.data
+    },
+  }
+
   // ─── Health ───────────────────────────────────────────────
 
   health = {
-    check: async (): Promise<boolean> => {
+    check: async (timeoutMs?: number): Promise<boolean> => {
       try {
-        const response = await this.client.get('/health')
+        const response = await this.client.get('/health', {
+          timeout: timeoutMs ?? 10000,
+        })
         return response.status === 200
       } catch {
         return false
@@ -429,6 +485,16 @@ class GrainApiClient {
   getBaseURL = (): string => this.baseURL
 }
 
-export const grainApi = new GrainApiClient(process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000/api')
+export const grainApi = new GrainApiClient(process.env.EXPO_PUBLIC_API_URL || 'https://grain-web-admin.onrender.com/api')
+
+/** Returns true if the error is a network/connectivity error (not a server response like 401). */
+export function isNetworkError(error: unknown): boolean {
+  if (error instanceof Error) {
+    const code = (error as any).code
+    const status = (error as any).status
+    return !status || status === 0 || code === 'NETWORK_ERROR' || code === 'ECONNABORTED'
+  }
+  return false
+}
 
 export type { GrainApiClient }

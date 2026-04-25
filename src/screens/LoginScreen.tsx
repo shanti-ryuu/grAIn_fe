@@ -28,6 +28,9 @@ export default function LoginScreen() {
   const router = useRouter();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [emailError, setEmailError] = useState('');
+  const [passwordError, setPasswordError] = useState('');
   const [serverStatus, setServerStatus] = useState<'checking' | 'online' | 'offline'>('checking');
   const emailRef = useRef<any>(null);
   const passwordRef = useRef<any>(null);
@@ -38,37 +41,65 @@ export default function LoginScreen() {
 
   useEffect(() => {
     if (error) clearError();
+    setEmailError('');
+    setPasswordError('');
   }, [email, password]);
 
   const checkServerHealth = async () => {
-    try {
-      const isHealthy = await grainApi.health.check();
-      setServerStatus(isHealthy ? 'online' : 'offline');
-    } catch {
-      setServerStatus('offline');
+    const RETRY_DELAYS = [2000, 4000, 8000];
+    for (let attempt = 0; attempt <= 3; attempt++) {
+      try {
+        const isHealthy = await grainApi.health.check(10000); // 10s timeout for quick ping
+        if (isHealthy) {
+          setServerStatus('online');
+          return;
+        }
+      } catch {
+        // network error, retry
+      }
+      if (attempt < 3) {
+        await new Promise((r) => setTimeout(r, RETRY_DELAYS[attempt]));
+      }
     }
+    setServerStatus('offline');
   };
 
   const handleLogin = async () => {
+    let valid = true;
+    setEmailError('');
+    setPasswordError('');
+
     if (!email.trim()) {
-      Alert.alert('Error', 'Please enter your email');
-      return;
-    }
-    if (!isValidEmail(email.trim())) {
-      Alert.alert('Error', 'Please enter a valid email address');
-      return;
+      setEmailError('Email is required');
+      valid = false;
+    } else if (!isValidEmail(email.trim())) {
+      setEmailError('Enter a valid email address');
+      valid = false;
     }
     if (!password.trim()) {
-      Alert.alert('Error', 'Please enter your password');
-      return;
+      setPasswordError('Password is required');
+      valid = false;
+    } else if (password.trim().length < 6) {
+      setPasswordError('Password must be at least 6 characters');
+      valid = false;
     }
+    if (!valid) return;
+
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     try {
       await login(email.trim(), password.trim());
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       router.replace('/(app)/dashboard');
     } catch (err: any) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-      Alert.alert('Login Failed', err?.message || 'Invalid credentials');
+      const msg = err?.message || 'Invalid credentials';
+      if (msg.toLowerCase().includes('email') || msg.toLowerCase().includes('user')) {
+        setEmailError(msg);
+      } else if (msg.toLowerCase().includes('password')) {
+        setPasswordError(msg);
+      } else {
+        setEmailError(msg);
+      }
     }
   };
 
@@ -115,7 +146,7 @@ export default function LoginScreen() {
                 <Text style={styles.inputLabel}>Email</Text>
                 <TextInput
                   ref={emailRef}
-                  style={styles.input}
+                  style={[styles.input, emailError ? styles.inputError : null]}
                   value={email}
                   onChangeText={setEmail}
                   placeholder="Enter your email"
@@ -127,26 +158,45 @@ export default function LoginScreen() {
                   returnKeyType="next"
                   onSubmitEditing={() => passwordRef.current?.focus()}
                 />
+                {emailError ? <Text style={styles.inlineError}>{emailError}</Text> : null}
               </View>
 
               <View style={styles.inputContainer}>
                 <Text style={styles.inputLabel}>Password</Text>
-                <TextInput
-                  ref={passwordRef}
-                  style={styles.input}
-                  value={password}
-                  onChangeText={setPassword}
-                  placeholder="Enter your password"
-                  placeholderTextColor="rgba(0,0,0,0.3)"
-                  secureTextEntry
-                  autoCapitalize="none"
-                  editable={!isLoading}
-                  returnKeyType="go"
-                  onSubmitEditing={handleLogin}
-                />
+                <View style={[styles.passwordWrapper, passwordError ? styles.inputError : null]}>
+                  <TextInput
+                    ref={passwordRef}
+                    style={styles.passwordInput}
+                    value={password}
+                    onChangeText={setPassword}
+                    placeholder="Enter your password"
+                    placeholderTextColor="rgba(0,0,0,0.3)"
+                    secureTextEntry={!showPassword}
+                    autoCapitalize="none"
+                    editable={!isLoading}
+                    returnKeyType="go"
+                    onSubmitEditing={handleLogin}
+                  />
+                  <TouchableOpacity
+                    onPress={() => setShowPassword(!showPassword)}
+                    style={styles.eyeButton}
+                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                  >
+                    <Ionicons
+                      name={showPassword ? 'eye-off-outline' : 'eye-outline'}
+                      size={20}
+                      color="#9CA3AF"
+                    />
+                  </TouchableOpacity>
+                </View>
+                {passwordError ? <Text style={styles.inlineError}>{passwordError}</Text> : null}
               </View>
 
-              {error ? <Text style={styles.errorText}>{error}</Text> : null}
+              <TouchableOpacity onPress={() => Alert.alert('Forgot Password', 'Password reset is not yet available. Please contact support.')} style={styles.forgotLink} activeOpacity={0.7}>
+                <Text style={styles.forgotText}>Forgot Password?</Text>
+              </TouchableOpacity>
+
+              {error && !emailError && !passwordError ? <Text style={styles.errorText}>{error}</Text> : null}
 
               <TouchableOpacity
                 style={[styles.signInButton, isLoading && styles.signInButtonDisabled]}
@@ -155,7 +205,10 @@ export default function LoginScreen() {
                 activeOpacity={0.7}
               >
                 {isLoading ? (
-                  <ActivityIndicator color="#FFFFFF" />
+                  <View style={styles.loadingRow}>
+                    <ActivityIndicator color="#FFFFFF" size="small" />
+                    <Text style={styles.signInButtonText}>Signing in…</Text>
+                  </View>
                 ) : (
                   <Text style={styles.signInButtonText}>Sign In</Text>
                 )}
@@ -287,6 +340,47 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     fontSize: 17,
     color: '#111111',
+  },
+  inputError: {
+    borderColor: '#EF4444',
+  },
+  inlineError: {
+    color: '#EF4444',
+    fontSize: 12,
+    marginTop: 4,
+  },
+  passwordWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F9FAFB',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+  },
+  passwordInput: {
+    flex: 1,
+    paddingVertical: 14,
+    fontSize: 17,
+    color: '#111111',
+  },
+  eyeButton: {
+    padding: 4,
+  },
+  forgotLink: {
+    alignSelf: 'flex-end',
+    marginTop: 4,
+    marginBottom: 8,
+  },
+  forgotText: {
+    ...IOS_TYPOGRAPHY.footnote,
+    color: '#22C55E',
+    fontWeight: '600',
+  },
+  loadingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   errorText: {
     color: '#EF4444',

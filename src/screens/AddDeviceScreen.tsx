@@ -24,20 +24,21 @@ export default function AddDeviceScreen() {
   const { showToast } = useAppContext();
   const [deviceId, setDeviceId] = useState('');
   const [location, setLocation] = useState('');
+  const [deviceIdError, setDeviceIdError] = useState('');
+  const [locationError, setLocationError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleSubmit = async () => {
     const trimmedId = deviceId.trim();
     const trimmedLocation = location.trim();
+    setDeviceIdError('');
+    setLocationError('');
 
-    if (!trimmedId) {
-      Alert.alert('Missing Device ID', 'Please enter a Device ID (e.g. GR-001).');
-      return;
-    }
-    if (!trimmedLocation) {
-      Alert.alert('Missing Location', 'Please enter a farm name or location (e.g. Farm A, Plot 1).');
-      return;
-    }
+    let valid = true;
+    if (!trimmedId) { setDeviceIdError('Device ID is required'); valid = false; }
+    else if (trimmedId.length < 3) { setDeviceIdError('Device ID must be at least 3 characters'); valid = false; }
+    if (!trimmedLocation) { setLocationError('Location is required'); valid = false; }
+    if (!valid) return;
 
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setIsSubmitting(true);
@@ -49,7 +50,15 @@ export default function AddDeviceScreen() {
       router.back();
     } catch (err: any) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-      Alert.alert('Connection Failed', err?.message || 'Could not register device. Please try again.');
+      const status = err?.response?.status;
+      const msg = err?.response?.data?.message || err?.message || '';
+      if (status === 409) {
+        setDeviceIdError('This device is already registered');
+      } else if (status === 403) {
+        setDeviceIdError('You do not have permission to add this device');
+      } else {
+        showToast(msg || 'Could not register device. Please try again.', 'error');
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -72,34 +81,36 @@ export default function AddDeviceScreen() {
 
           <View style={styles.form}>
             <Text style={styles.label}>Device ID</Text>
-            <View style={styles.inputWrapper}>
+            <View style={[styles.inputWrapper, deviceIdError && styles.inputError]}>
               <View style={styles.inputIcon}><Ionicons name="barcode-outline" size={20} color="#9CA3AF" /></View>
               <TextInput
                 style={styles.input}
                 placeholder="e.g. GR-001"
                 placeholderTextColor="#9CA3AF"
                 value={deviceId}
-                onChangeText={setDeviceId}
+                onChangeText={(t) => { setDeviceId(t); setDeviceIdError(''); }}
                 autoCapitalize="characters"
                 autoCorrect={false}
                 editable={!isSubmitting}
               />
             </View>
+            {deviceIdError ? <Text style={styles.inlineError}>{deviceIdError}</Text> : null}
 
             <Text style={[styles.label, { marginTop: 16 }]}>Location / Farm Name</Text>
-            <View style={styles.inputWrapper}>
+            <View style={[styles.inputWrapper, locationError && styles.inputError]}>
               <View style={styles.inputIcon}><Ionicons name="location-outline" size={20} color="#9CA3AF" /></View>
               <TextInput
                 style={styles.input}
                 placeholder="e.g. Farm A, Plot 1"
                 placeholderTextColor="#9CA3AF"
                 value={location}
-                onChangeText={setLocation}
+                onChangeText={(t) => { setLocation(t); setLocationError(''); }}
                 autoCapitalize="words"
                 autoCorrect={false}
                 editable={!isSubmitting}
               />
             </View>
+            {locationError ? <Text style={styles.inlineError}>{locationError}</Text> : null}
 
             <TouchableOpacity
               style={[styles.connectButton, isSubmitting && styles.connectButtonDisabled]}
@@ -176,6 +187,14 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     paddingHorizontal: 12,
     height: 48,
+  },
+  inputError: {
+    borderColor: '#EF4444',
+  },
+  inlineError: {
+    color: '#EF4444',
+    fontSize: 12,
+    marginTop: 4,
   },
   inputIcon: {
     marginRight: 8,

@@ -20,7 +20,7 @@ import type { Device } from '@/api';
 import { useDevices } from '@/hooks';
 import { useAppContext } from '@/context/AppContext';
 import { useAIPrediction, runPrediction } from '@/hooks/useAIPrediction';
-import type { SensorInput } from '@/hooks/useAIPrediction';
+import type { SensorInput, AIPrediction } from '@/hooks/useAIPrediction';
 import { GRADIENTS, IOS_TYPOGRAPHY } from '@/utils/constants';
 
 export default function ControlScreen() {
@@ -33,6 +33,10 @@ export default function ControlScreen() {
   const [fanSpeed, setFanSpeed] = useState(75);
   const [isControlling, setIsControlling] = useState(false);
   const [aiAutoStopped, setAiAutoStopped] = useState(false);
+  const [aiPrediction, setAiPrediction] = useState<AIPrediction | null>(null);
+  const [aiLoading, setAiLoading] = useState(false);
+
+  const deviceId = selectedDevice?.deviceId;
 
   useEffect(() => {
     if (devices.length > 0 && !selectedDevice) {
@@ -40,7 +44,72 @@ export default function ControlScreen() {
     }
   }, [devices, selectedDevice]);
 
-  const deviceId = selectedDevice?.deviceId;
+  // AI prediction polling in AUTO mode when running
+  useEffect(() => {
+    if (mode !== 'auto' || !isRunning || !deviceId) return;
+
+    const fetchAIPrediction = async () => {
+      setAiLoading(true);
+      try {
+        const latest = await grainApi.sensors.getLatestData(deviceId);
+        const input: SensorInput = {
+          deviceId,
+          temperature: latest?.temperature ?? 65.5,
+          humidity: latest?.humidity ?? 50,
+          moisture: latest?.moisture ?? 20,
+          fanSpeed: latest?.fanSpeed ?? 75,
+          timeElapsed: 60,
+        };
+        try {
+          const result = await grainApi.ai.predict(input);
+          setAiPrediction({
+            predictedMoisture30min: result.predictedMoisture30min,
+            estimatedMinutesToTarget: result.estimatedMinutesToTarget,
+            recommendation: result.recommendation,
+            recommendationType: result.recommendationType,
+            efficiencyScore: result.efficiencyScore,
+            confidence: result.confidence,
+            isDryingComplete: result.isDryingComplete,
+            projectedMoistureCurve: result.projectedCurve,
+            targetMoisture: result.targetMoisture,
+            algorithm: result.algorithm,
+          });
+          // Auto-stop if drying complete
+          if (result.isDryingComplete && !aiAutoStopped) {
+            setAiAutoStopped(true);
+            try {
+              await grainApi.dryer.stop(deviceId);
+              setIsRunning(false);
+              Alert.alert('Drying Complete', 'Drying complete — dryer stopped by AI');
+            } catch (err: any) {
+              console.error('AI auto-stop failed:', err);
+            }
+          }
+        } catch {
+          const result = runPrediction(input);
+          setAiPrediction(result);
+          if (result.isDryingComplete && !aiAutoStopped) {
+            setAiAutoStopped(true);
+            try {
+              await grainApi.dryer.stop(deviceId);
+              setIsRunning(false);
+              Alert.alert('Drying Complete', 'Drying complete — dryer stopped by AI');
+            } catch (err: any) {
+              console.error('AI auto-stop failed:', err);
+            }
+          }
+        }
+      } catch {
+        // Sensor fetch failed
+      } finally {
+        setAiLoading(false);
+      }
+    };
+
+    fetchAIPrediction();
+    const interval = setInterval(fetchAIPrediction, 60000);
+    return () => clearInterval(interval);
+  }, [mode, isRunning, deviceId, aiAutoStopped]);
 
   const handleStopDryer = async () => {
     if (!deviceId) {
@@ -75,18 +144,34 @@ export default function ControlScreen() {
       Alert.alert('No Device', 'Please select a device first.');
       return;
     }
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    setIsControlling(true);
-    try {
-      await grainApi.dryer.start(deviceId, mode, temperature, fanSpeed);
-      setIsRunning(true);
-      showToast('Dryer started successfully', 'success');
-    } catch (err: any) {
-      Alert.alert('Error', err?.message || 'Failed to start dryer');
-      showToast(err?.message || 'Failed to start dryer', 'error');
-    } finally {
-      setIsControlling(false);
-    }
+    const deviceName = selectedDevice?.name || deviceId;
+    Alert.alert(
+      'Start Dryer',
+      `Start drying cycle?\n\nDevice: ${deviceName}\nMode: ${mode === 'auto' ? 'AI Auto' : 'Manual'}\n${mode === 'manual' ? `Temp: ${temperature.toFixed(1)}°C\nFan: ${fanSpeed}%` : 'AI will adjust settings automatically'}`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Start',
+          style: 'default',
+          onPress: async () => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+            setIsControlling(true);
+            try {
+              await grainApi.dryer.start(deviceId, mode, temperature, fanSpeed);
+              setIsRunning(true);
+              setAiAutoStopped(false);
+              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+              showToast('Dryer started successfully', 'success');
+            } catch (err: any) {
+              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+              showToast(err?.message || 'Failed to start dryer', 'error');
+            } finally {
+              setIsControlling(false);
+            }
+          },
+        },
+      ],
+    );
   };
 
   return (
@@ -205,10 +290,32 @@ export default function ControlScreen() {
               {mode === 'auto' && isRunning && (
                 <View style={styles.aiCard}>
                   <View style={styles.aiCardHeader}>
-                    <Ionicons name="sparkles" size={20} color="#22C55E" />
+                    <View style={styles.aiActiveBadge}>
+                      <Ionicons name="sparkles" size={14} color="#FFFFFF" />
+                    </View>
                     <Text style={styles.aiCardTitle}>AI is controlling the dryer</Text>
                   </View>
                   <Text style={styles.aiCardSubtext}>AI automatically adjusts fan speed and temperature for optimal drying</Text>
+                  {aiPrediction && (
+                    <>
+                      <View style={styles.aiRecRow}>
+                        <Ionicons
+                          name={aiPrediction.recommendationType === 'optimal' ? 'checkmark-circle' : aiPrediction.recommendationType === 'warning' ? 'warning' : 'alert-circle'}
+                          size={16}
+                          color={aiPrediction.recommendationType === 'optimal' ? '#22C55E' : aiPrediction.recommendationType === 'warning' ? '#F59E0B' : '#EF4444'}
+                        />
+                        <Text style={[styles.aiRecText, { color: aiPrediction.recommendationType === 'optimal' ? '#16A34A' : aiPrediction.recommendationType === 'warning' ? '#D97706' : '#DC2626' }]}>
+                          {aiPrediction.recommendation}
+                        </Text>
+                      </View>
+                      {!aiPrediction.isDryingComplete && (
+                        <Text style={styles.aiEstText}>
+                          Est. completion: {Math.floor(aiPrediction.estimatedMinutesToTarget / 60)}h {aiPrediction.estimatedMinutesToTarget % 60}m
+                        </Text>
+                      )}
+                    </>
+                  )}
+                  {aiLoading && <ActivityIndicator size="small" color="#22C55E" style={{ marginTop: 4 }} />}
                   {aiAutoStopped && (
                     <View style={styles.aiStoppedBanner}>
                       <Ionicons name="checkmark-circle" size={18} color="#22C55E" />
@@ -507,6 +614,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 8,
   },
+  aiActiveBadge: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: '#22C55E',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   aiCardTitle: {
     ...IOS_TYPOGRAPHY.headline,
     color: '#16A34A',
@@ -514,6 +629,22 @@ const styles = StyleSheet.create({
   aiCardSubtext: {
     ...IOS_TYPOGRAPHY.footnote,
     color: '#6B7280',
+  },
+  aiRecRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 6,
+    marginTop: 4,
+  },
+  aiRecText: {
+    ...IOS_TYPOGRAPHY.footnote,
+    fontWeight: '500',
+    flex: 1,
+  },
+  aiEstText: {
+    ...IOS_TYPOGRAPHY.caption1,
+    color: '#6B7280',
+    marginTop: 2,
   },
   aiStoppedBanner: {
     flexDirection: 'row',

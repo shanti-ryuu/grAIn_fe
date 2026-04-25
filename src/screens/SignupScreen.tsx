@@ -16,6 +16,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
+import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/hooks';
 import { grainApi } from '@/api';
@@ -31,50 +32,48 @@ export default function SignupScreen() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [nameError, setNameError] = useState('');
+  const [emailError, setEmailError] = useState('');
+  const [passwordError, setPasswordError] = useState('');
+  const [confirmError, setConfirmError] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
 
   const emailRef = useRef<any>(null);
   const passwordRef = useRef<any>(null);
   const confirmRef = useRef<any>(null);
 
+  // Clear inline errors on input change
+  const clearFieldErrors = () => { setNameError(''); setEmailError(''); setPasswordError(''); setConfirmError(''); setError(null); };
+
   const handleSignup = async () => {
     setError(null);
+    setNameError('');
+    setEmailError('');
+    setPasswordError('');
+    setConfirmError('');
+    let valid = true;
 
-    if (!name.trim()) {
-      Alert.alert('Error', 'Please enter your full name');
-      return;
-    }
-    if (!email.trim()) {
-      Alert.alert('Error', 'Please enter your email');
-      return;
-    }
-    if (!validateEmail(email.trim())) {
-      Alert.alert('Error', 'Please enter a valid email address');
-      return;
-    }
-    if (!password.trim()) {
-      Alert.alert('Error', 'Please enter a password');
-      return;
-    }
-    if (password.length < 6) {
-      Alert.alert('Error', 'Password must be at least 6 characters');
-      return;
-    }
-    if (password !== confirmPassword) {
-      Alert.alert('Error', 'Passwords do not match');
-      return;
-    }
+    if (!name.trim()) { setNameError('Name is required'); valid = false; }
+    if (!email.trim()) { setEmailError('Email is required'); valid = false; }
+    else if (!validateEmail(email.trim())) { setEmailError('Enter a valid email address'); valid = false; }
+    if (!password.trim()) { setPasswordError('Password is required'); valid = false; }
+    else if (password.length < 6) { setPasswordError('Password must be at least 6 characters'); valid = false; }
+    if (!confirmPassword.trim()) { setConfirmError('Please confirm your password'); valid = false; }
+    else if (password !== confirmPassword) { setConfirmError('Passwords do not match'); valid = false; }
+    if (!valid) return;
 
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setIsLoading(true);
     try {
-      const { user } = await grainApi.auth.register(name.trim(), email.trim(), password.trim());
+      await grainApi.auth.register(name.trim(), email.trim(), password.trim());
       await login(email.trim(), password.trim());
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       router.replace('/(app)/dashboard');
     } catch (err: any) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       const message = err?.message || 'Registration failed. Please try again.';
       setError(message);
-      Alert.alert('Signup Failed', message);
     } finally {
       setIsLoading(false);
     }
@@ -112,9 +111,9 @@ export default function SignupScreen() {
               <View style={styles.inputContainer}>
                 <Text style={styles.inputLabel}>Full Name</Text>
                 <TextInput
-                  style={styles.input}
+                  style={[styles.input, nameError ? styles.inputError : null]}
                   value={name}
-                  onChangeText={setName}
+                  onChangeText={(t) => { setName(t); setNameError(''); }}
                   placeholder="Enter your full name"
                   placeholderTextColor="rgba(0,0,0,0.3)"
                   autoCapitalize="words"
@@ -123,15 +122,16 @@ export default function SignupScreen() {
                   returnKeyType="next"
                   onSubmitEditing={() => emailRef.current?.focus()}
                 />
+                {nameError ? <Text style={styles.inlineError}>{nameError}</Text> : null}
               </View>
 
               <View style={styles.inputContainer}>
                 <Text style={styles.inputLabel}>Email Address</Text>
                 <TextInput
                   ref={emailRef}
-                  style={styles.input}
+                  style={[styles.input, emailError ? styles.inputError : null]}
                   value={email}
-                  onChangeText={setEmail}
+                  onChangeText={(t) => { setEmail(t); setEmailError(''); }}
                   placeholder="Enter your email"
                   placeholderTextColor="rgba(0,0,0,0.3)"
                   keyboardType="email-address"
@@ -141,40 +141,53 @@ export default function SignupScreen() {
                   returnKeyType="next"
                   onSubmitEditing={() => passwordRef.current?.focus()}
                 />
+                {emailError ? <Text style={styles.inlineError}>{emailError}</Text> : null}
               </View>
 
               <View style={styles.inputContainer}>
                 <Text style={styles.inputLabel}>Password</Text>
-                <TextInput
-                  ref={passwordRef}
-                  style={styles.input}
-                  value={password}
-                  onChangeText={setPassword}
-                  placeholder="Create a password"
-                  placeholderTextColor="rgba(0,0,0,0.3)"
-                  secureTextEntry
-                  autoCapitalize="none"
-                  editable={!isLoading}
-                  returnKeyType="next"
-                  onSubmitEditing={() => confirmRef.current?.focus()}
-                />
+                <View style={[styles.passwordWrapper, passwordError ? styles.inputError : null]}>
+                  <TextInput
+                    ref={passwordRef}
+                    style={styles.passwordInput}
+                    value={password}
+                    onChangeText={(t) => { setPassword(t); setPasswordError(''); }}
+                    placeholder="Create a password"
+                    placeholderTextColor="rgba(0,0,0,0.3)"
+                    secureTextEntry={!showPassword}
+                    autoCapitalize="none"
+                    editable={!isLoading}
+                    returnKeyType="next"
+                    onSubmitEditing={() => confirmRef.current?.focus()}
+                  />
+                  <TouchableOpacity onPress={() => setShowPassword(!showPassword)} style={styles.eyeButton} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+                    <Ionicons name={showPassword ? 'eye-off-outline' : 'eye-outline'} size={20} color="#9CA3AF" />
+                  </TouchableOpacity>
+                </View>
+                {passwordError ? <Text style={styles.inlineError}>{passwordError}</Text> : null}
               </View>
 
               <View style={styles.inputContainer}>
                 <Text style={styles.inputLabel}>Confirm Password</Text>
-                <TextInput
-                  ref={confirmRef}
-                  style={styles.input}
-                  value={confirmPassword}
-                  onChangeText={setConfirmPassword}
-                  placeholder="Confirm your password"
-                  placeholderTextColor="rgba(0,0,0,0.3)"
-                  secureTextEntry
-                  autoCapitalize="none"
-                  editable={!isLoading}
-                  returnKeyType="go"
-                  onSubmitEditing={handleSignup}
-                />
+                <View style={[styles.passwordWrapper, confirmError ? styles.inputError : null]}>
+                  <TextInput
+                    ref={confirmRef}
+                    style={styles.passwordInput}
+                    value={confirmPassword}
+                    onChangeText={(t) => { setConfirmPassword(t); setConfirmError(''); }}
+                    placeholder="Confirm your password"
+                    placeholderTextColor="rgba(0,0,0,0.3)"
+                    secureTextEntry={!showConfirm}
+                    autoCapitalize="none"
+                    editable={!isLoading}
+                    returnKeyType="go"
+                    onSubmitEditing={handleSignup}
+                  />
+                  <TouchableOpacity onPress={() => setShowConfirm(!showConfirm)} style={styles.eyeButton} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+                    <Ionicons name={showConfirm ? 'eye-off-outline' : 'eye-outline'} size={20} color="#9CA3AF" />
+                  </TouchableOpacity>
+                </View>
+                {confirmError ? <Text style={styles.inlineError}>{confirmError}</Text> : null}
               </View>
 
               {error ? <Text style={styles.errorText}>{error}</Text> : null}
@@ -186,7 +199,10 @@ export default function SignupScreen() {
                 activeOpacity={0.7}
               >
                 {isLoading ? (
-                  <ActivityIndicator color="#FFFFFF" />
+                  <View style={styles.loadingRow}>
+                    <ActivityIndicator color="#FFFFFF" size="small" />
+                    <Text style={styles.createButtonText}>Creating account…</Text>
+                  </View>
                 ) : (
                   <Text style={styles.createButtonText}>Create Account</Text>
                 )}
@@ -299,6 +315,37 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     fontSize: 17,
     color: '#111111',
+  },
+  inputError: {
+    borderColor: '#EF4444',
+  },
+  inlineError: {
+    color: '#EF4444',
+    fontSize: 12,
+    marginTop: 4,
+  },
+  passwordWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F9FAFB',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+  },
+  passwordInput: {
+    flex: 1,
+    paddingVertical: 14,
+    fontSize: 17,
+    color: '#111111',
+  },
+  eyeButton: {
+    padding: 4,
+  },
+  loadingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   errorText: {
     color: '#EF4444',

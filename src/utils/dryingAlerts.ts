@@ -1,5 +1,5 @@
 export interface DryingAlert {
-  type: 'over_drying' | 'under_drying' | 'optimal' | 'complete';
+  type: 'over_drying' | 'under_drying' | 'complete' | 'normal';
   severity: 'info' | 'warning' | 'critical';
   message: string;
   action: string;
@@ -30,7 +30,7 @@ export function analyzeDryingStatus(
     };
   }
 
-  if (temperature > 65 && currentMoisture > 20) {
+  if (temperature > 65) {
     return {
       type: 'over_drying',
       severity: 'warning',
@@ -40,7 +40,7 @@ export function analyzeDryingStatus(
   }
 
   return {
-    type: 'under_drying',
+    type: 'normal',
     severity: 'info',
     message: `Continue drying — current moisture: ${currentMoisture}%`,
     action: `Target: ${targetMoisture}% for safe storage`,

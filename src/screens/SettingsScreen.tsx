@@ -8,6 +8,7 @@ import { Ionicons } from '@expo/vector-icons';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as SecureStore from 'expo-secure-store';
+import Constants from 'expo-constants';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/hooks';
 import { useAppContext } from '@/context/AppContext';
@@ -82,20 +83,45 @@ export default function SettingsScreen() {
           <Text style={styles.screenTitle}>Settings</Text>
 
           {/* User Info */}
-          {user && (
+            {/* Account Section */}
             <View style={styles.card}>
               <Text style={styles.cardLabel}>ACCOUNT</Text>
-              <View style={styles.userRow}>
-                <View style={styles.avatar}>
-                  <Text style={styles.avatarText}>{user.name?.charAt(0)?.toUpperCase() || 'U'}</Text>
+              <TouchableOpacity
+                style={styles.settingRow}
+                onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push('/(app)/profile' as any); }}
+                activeOpacity={0.7}
+              >
+                <View style={styles.settingInfo}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                    <Ionicons name="person-outline" size={20} color="#6B7280" />
+                    <Text style={styles.settingLabel}>My Profile</Text>
+                  </View>
                 </View>
-                <View style={styles.userInfo}>
-                  <Text style={styles.userName}>{user.name}</Text>
-                  <Text style={styles.userEmail}>{user.email}</Text>
+                <Ionicons name="chevron-forward" size={18} color="#D1D5DB" />
+              </TouchableOpacity>
+              <View style={styles.settingRow}>
+                <View style={styles.settingInfo}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                    <Ionicons name="mail-outline" size={20} color="#6B7280" />
+                    <View>
+                      <Text style={styles.settingLabel}>Email</Text>
+                      <Text style={styles.settingDesc}>{user?.email || 'Not set'}</Text>
+                    </View>
+                  </View>
+                </View>
+              </View>
+              <View style={styles.settingRow}>
+                <View style={styles.settingInfo}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                    <Ionicons name="shield-checkmark-outline" size={20} color="#6B7280" />
+                    <View>
+                      <Text style={styles.settingLabel}>Role</Text>
+                      <Text style={styles.settingDesc}>{user?.role || 'farmer'}</Text>
+                    </View>
+                  </View>
                 </View>
               </View>
             </View>
-          )}
 
           {/* Connected Devices */}
           <View style={styles.card}>
@@ -189,6 +215,10 @@ export default function SettingsScreen() {
             <Ionicons name="log-out-outline" size={20} color="#FFFFFF" />
             <Text style={styles.logoutButtonText}>Logout</Text>
           </TouchableOpacity>
+
+          <View style={styles.versionRow}>
+            <Text style={styles.versionText}>grAIn v{Constants.expoConfig?.version ?? '1.0.0'}</Text>
+          </View>
         </ScrollView>
         </Animated.View>
         <Navigation />
@@ -228,4 +258,6 @@ const styles = StyleSheet.create({
   unitActiveText: { color: '#22C55E' },
   logoutButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: '#EF4444', borderRadius: 50, paddingVertical: 16, shadowColor: '#EF4444', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 4 },
   logoutButtonText: { color: '#FFFFFF', ...IOS_TYPOGRAPHY.headline },
+  versionRow: { alignItems: 'center', paddingVertical: 16 },
+  versionText: { ...IOS_TYPOGRAPHY.caption1, color: '#9CA3AF' },
 });

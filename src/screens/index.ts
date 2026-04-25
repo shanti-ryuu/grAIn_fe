@@ -8,3 +8,4 @@ export { default as AlertsScreen } from './AlertsScreen';
 export { default as AnalyticsScreen } from './AnalyticsScreen';
 export { default as SettingsScreen } from './SettingsScreen';
 export { default as AIPredictionScreen } from './AIPredictionScreen';
+export { default as ProfileScreen } from './ProfileScreen';

@@ -1,8 +1,10 @@
 import { useState, useEffect, useCallback } from 'react';
+import { grainApi } from '@/api';
 
 // ─── Types ────────────────────────────────────────────────
 
 export interface SensorInput {
+  deviceId: string;       // Device ID
   temperature: number;   // °C
   humidity: number;      // %
   moisture: number;      // current grain moisture %
@@ -20,6 +22,8 @@ export interface AIPrediction {
   confidence: number;        // 0–100
   isDryingComplete: boolean;
   projectedMoistureCurve: { time: number; moisture: number }[];
+  targetMoisture: number;
+  algorithm: string;
 }
 
 // ─── Physics-based drying model (Page's equation simplified) ────
@@ -153,6 +157,8 @@ export function runPrediction(input: SensorInput): AIPrediction {
     confidence,
     isDryingComplete,
     projectedMoistureCurve,
+    targetMoisture: TARGET_MOISTURE,
+    algorithm: 'Rule-based Drying Model v1',
   };
 }
 
@@ -160,16 +166,38 @@ export function runPrediction(input: SensorInput): AIPrediction {
 
 export function useAIPrediction(sensorInput: SensorInput | null) {
   const [prediction, setPrediction] = useState<AIPrediction | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
 
-  const compute = useCallback(() => {
+  const compute = useCallback(async () => {
     if (!sensorInput) return;
-    const result = runPrediction(sensorInput);
-    setPrediction(result);
+    setIsLoading(true);
+    try {
+      // Try server-side prediction first
+      const result = await grainApi.ai.predict(sensorInput);
+      setPrediction({
+        predictedMoisture30min: result.predictedMoisture30min,
+        estimatedMinutesToTarget: result.estimatedMinutesToTarget,
+        recommendation: result.recommendation,
+        recommendationType: result.recommendationType,
+        efficiencyScore: result.efficiencyScore,
+        confidence: result.confidence,
+        isDryingComplete: result.isDryingComplete,
+        projectedMoistureCurve: result.projectedCurve,
+        targetMoisture: result.targetMoisture,
+        algorithm: result.algorithm,
+      });
+    } catch {
+      // Server unavailable — use client-side prediction
+      const result = runPrediction(sensorInput);
+      setPrediction(result);
+    } finally {
+      setIsLoading(false);
+    }
   }, [sensorInput]);
 
   useEffect(() => {
     compute();
   }, [compute]);
 
-  return { prediction, recompute: compute };
+  return { prediction, isLoading, recompute: compute };
 }

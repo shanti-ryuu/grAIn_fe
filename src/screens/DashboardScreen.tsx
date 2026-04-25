@@ -127,14 +127,41 @@ export default function DashboardScreen() {
 
             <View style={styles.titleRow}>
               <Text style={styles.sectionTitle}>Your Devices</Text>
-              <TouchableOpacity
-                style={styles.addButton}
-                onPress={handleAddDevice}
-                activeOpacity={0.7}
-              >
-                <Ionicons name="add" size={22} color="#FFFFFF" />
-              </TouchableOpacity>
+              <View style={styles.titleActions}>
+                <TouchableOpacity
+                  style={styles.profileButton}
+                  onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push('/(app)/profile' as any); }}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons name="person-circle-outline" size={28} color="#22C55E" />
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.addButton}
+                  onPress={handleAddDevice}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons name="add" size={22} color="#FFFFFF" />
+                </TouchableOpacity>
+              </View>
             </View>
+
+            {/* AI Insights Card */}
+            <TouchableOpacity
+              style={styles.aiCard}
+              onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push('/(app)/ai-prediction' as any); }}
+              activeOpacity={0.7}
+            >
+              <View style={styles.aiCardLeft}>
+                <View style={styles.aiIconBg}>
+                  <Ionicons name="sparkles" size={22} color="#22C55E" />
+                </View>
+                <View style={styles.aiCardText}>
+                  <Text style={styles.aiCardTitle}>AI Insights</Text>
+                  <Text style={styles.aiCardSub}>View drying predictions & recommendations</Text>
+                </View>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color="#9CA3AF" />
+            </TouchableOpacity>
 
             {isLoading && devices.length === 0 ? (
               <SkeletonDeviceCards />
@@ -168,9 +195,15 @@ export default function DashboardScreen() {
                   activeOpacity={0.7}
                 >
                   <View style={styles.deviceCard}>
-                    <View style={styles.deviceInfo}>
-                      <Text style={styles.deviceName}>{device.name || device.deviceId}</Text>
-                      <Text style={styles.deviceLocation}>{device.location || 'No location'}</Text>
+                    <View style={styles.deviceLeft}>
+                      <View style={[styles.deviceIconCircle, { backgroundColor: device.status === 'online' ? '#DCFCE7' : '#F3F4F6' }]}>
+                        <Ionicons name="hardware-chip-outline" size={20} color={device.status === 'online' ? '#22C55E' : '#9CA3AF'} />
+                      </View>
+                      <View style={styles.deviceInfo}>
+                        <Text style={styles.deviceName}>{device.name || device.deviceId}</Text>
+                        <Text style={styles.deviceLocation}>{device.location || 'No location'}</Text>
+                        <Text style={styles.deviceMeta}>{device.deviceId} · {device.status === 'online' ? 'Active now' : 'Offline'}</Text>
+                      </View>
                     </View>
                     <StatusBadge status={device.status === 'online' ? 'online' : 'offline'} size="md" />
                   </View>
@@ -179,6 +212,16 @@ export default function DashboardScreen() {
             )}
           </ScrollView>
         </Animated.View>
+
+        {/* FAB - Floating Action Button */}
+        <TouchableOpacity
+          style={styles.fab}
+          onPress={handleAddDevice}
+          activeOpacity={0.7}
+        >
+          <Ionicons name="add" size={28} color="#FFFFFF" />
+        </TouchableOpacity>
+
         <Navigation />
       </LinearGradient>
     </SafeAreaView>
@@ -236,6 +279,19 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 3,
   },
+  deviceLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    flex: 1,
+  },
+  deviceIconCircle: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   deviceInfo: {
     flex: 1,
   },
@@ -247,6 +303,27 @@ const styles = StyleSheet.create({
     ...IOS_TYPOGRAPHY.footnote,
     color: '#6B7280',
     marginTop: 2,
+  },
+  deviceMeta: {
+    ...IOS_TYPOGRAPHY.caption2,
+    color: '#9CA3AF',
+    marginTop: 2,
+  },
+  fab: {
+    position: 'absolute',
+    right: 20,
+    bottom: 100,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#22C55E',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#22C55E',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.35,
+    shadowRadius: 12,
+    elevation: 8,
   },
   errorContainer: {
     alignItems: 'center',
@@ -351,6 +428,55 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   dryingAlertAction: {
+    ...IOS_TYPOGRAPHY.caption1,
+    color: '#6B7280',
+  },
+  titleActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  profileButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  aiCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#F0FDF4',
+    borderRadius: 16,
+    padding: 14,
+    borderWidth: 1.5,
+    borderColor: '#22C55E',
+    marginBottom: 4,
+  },
+  aiCardLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    flex: 1,
+  },
+  aiIconBg: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#DCFCE7',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  aiCardText: {
+    flex: 1,
+    gap: 2,
+  },
+  aiCardTitle: {
+    ...IOS_TYPOGRAPHY.headline,
+    color: '#16A34A',
+  },
+  aiCardSub: {
     ...IOS_TYPOGRAPHY.caption1,
     color: '#6B7280',
   },

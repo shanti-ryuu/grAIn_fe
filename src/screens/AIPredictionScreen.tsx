@@ -18,6 +18,7 @@ import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import { LineChart } from 'react-native-chart-kit';
 import { Header, Navigation } from '@/components';
 import { grainApi } from '@/api';
+import type { AIPrediction as APIAIPrediction } from '@/api';
 import { useAppContext } from '@/context/AppContext';
 import { useAIPrediction, runPrediction } from '@/hooks/useAIPrediction';
 import type { SensorInput, AIPrediction } from '@/hooks/useAIPrediction';
@@ -42,6 +43,7 @@ export default function AIPredictionScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [prediction, setPrediction] = useState<AIPrediction | null>(null);
+  const [isOfflineFallback, setIsOfflineFallback] = useState(false);
   const { showToast } = useAppContext();
 
   const fetchPrediction = useCallback(async () => {
@@ -53,6 +55,7 @@ export default function AIPredictionScreen() {
         const latest = await grainApi.sensors.getLatestData(device.deviceId);
         if (latest) {
           const input: SensorInput = {
+            deviceId: device.deviceId,
             temperature: latest.temperature ?? 45,
             humidity: latest.humidity ?? 50,
             moisture: latest.moisture ?? 20,
@@ -61,7 +64,8 @@ export default function AIPredictionScreen() {
           };
           // Try API, fall back to client-side
           try {
-            const result = await grainApi.ai.predict(device.deviceId, input);
+            const result = await grainApi.ai.predict(input);
+            setIsOfflineFallback(false);
             setPrediction({
               predictedMoisture30min: result.predictedMoisture30min,
               estimatedMinutesToTarget: result.estimatedMinutesToTarget,
@@ -71,21 +75,27 @@ export default function AIPredictionScreen() {
               confidence: result.confidence,
               isDryingComplete: result.isDryingComplete,
               projectedMoistureCurve: result.projectedCurve,
+              targetMoisture: result.targetMoisture,
+              algorithm: result.algorithm,
             });
           } catch {
             // Server unavailable — use client-side prediction
+            setIsOfflineFallback(true);
             setPrediction(runPrediction(input));
           }
         } else {
           // No sensor data — use demo input
-          setPrediction(runPrediction({ temperature: 45, humidity: 50, moisture: 20, fanSpeed: 70, timeElapsed: 60 }));
+          setIsOfflineFallback(true);
+          setPrediction(runPrediction({ deviceId: 'demo', temperature: 45, humidity: 50, moisture: 20, fanSpeed: 70, timeElapsed: 60 }));
         }
       } else {
-        setPrediction(runPrediction({ temperature: 45, humidity: 50, moisture: 20, fanSpeed: 70, timeElapsed: 60 }));
+        setIsOfflineFallback(true);
+        setPrediction(runPrediction({ deviceId: 'demo', temperature: 45, humidity: 50, moisture: 20, fanSpeed: 70, timeElapsed: 60 }));
       }
     } catch {
       // Complete fallback — client-side demo
-      setPrediction(runPrediction({ temperature: 45, humidity: 50, moisture: 20, fanSpeed: 70, timeElapsed: 60 }));
+      setIsOfflineFallback(true);
+      setPrediction(runPrediction({ deviceId: 'demo', temperature: 45, humidity: 50, moisture: 20, fanSpeed: 70, timeElapsed: 60 }));
     } finally {
       setIsLoading(false);
     }
@@ -156,6 +166,12 @@ export default function AIPredictionScreen() {
             <View style={styles.titleRow}>
               <Ionicons name="sparkles" size={24} color="#22C55E" />
               <Text style={styles.screenTitle}>AI Predictions</Text>
+              {isOfflineFallback && (
+                <View style={styles.offlineBadge}>
+                  <Ionicons name="cloud-offline-outline" size={12} color="#F97316" />
+                  <Text style={styles.offlineBadgeText}>Offline</Text>
+                </View>
+              )}
             </View>
             <Text style={styles.screenSubtitle}>AI-Assisted drying optimization</Text>
 
@@ -165,7 +181,11 @@ export default function AIPredictionScreen() {
                 <Text style={styles.loadingText}>Analyzing drying data...</Text>
               </View>
             ) : prediction ? (
-              <>
+              <View>
+              <TouchableOpacity style={styles.runButton} onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); fetchPrediction(); }} activeOpacity={0.7}>
+                <Ionicons name="refresh-outline" size={16} color="#22C55E" />
+                <Text style={styles.runButtonText}>Run Prediction</Text>
+              </TouchableOpacity>
                 {/* Card 1: Predicted Moisture */}
                 <View style={styles.card}>
                   <View style={styles.cardHeader}>
@@ -218,44 +238,33 @@ export default function AIPredictionScreen() {
                   </View>
                 </View>
 
-                {/* Card 4: Efficiency Score */}
+                {/* Card 4: 2x2 Mini Stats Grid */}
                 <View style={styles.card}>
                   <View style={styles.cardHeader}>
-                    <Ionicons name="speedometer-outline" size={20} color="#22C55E" />
-                    <Text style={styles.cardTitle}>Drying Efficiency</Text>
+                    <Ionicons name="stats-chart-outline" size={20} color="#22C55E" />
+                    <Text style={styles.cardTitle}>AI Metrics</Text>
                   </View>
-                  <View style={styles.scoreRow}>
-                    <View style={styles.circularProgress}>
-                      <View style={[styles.circularFill, { height: `${prediction.efficiencyScore}%`, backgroundColor: prediction.efficiencyScore >= 70 ? '#22C55E' : prediction.efficiencyScore >= 40 ? '#FBBF24' : '#EF4444' }]} />
+                  <View style={styles.statsGrid}>
+                    <View style={styles.statCell}>
+                      <Text style={styles.statLabel}>Efficiency</Text>
+                      <Text style={[styles.statValue, { color: prediction.efficiencyScore >= 70 ? '#22C55E' : prediction.efficiencyScore >= 40 ? '#FBBF24' : '#EF4444' }]}>{prediction.efficiencyScore}%</Text>
                     </View>
-                    <Text style={styles.scoreValue}>{prediction.efficiencyScore}%</Text>
+                    <View style={styles.statCell}>
+                      <Text style={styles.statLabel}>Confidence</Text>
+                      <Text style={[styles.statValue, { color: prediction.confidence >= 80 ? '#22C55E' : prediction.confidence >= 60 ? '#FBBF24' : '#EF4444' }]}>{prediction.confidence}%</Text>
+                    </View>
+                    <View style={styles.statCell}>
+                      <Text style={styles.statLabel}>Target</Text>
+                      <Text style={styles.statValue}>{prediction.targetMoisture}%</Text>
+                    </View>
+                    <View style={styles.statCell}>
+                      <Text style={styles.statLabel}>Status</Text>
+                      <Text style={[styles.statValue, { color: prediction.isDryingComplete ? '#22C55E' : '#F97316' }]}>{prediction.isDryingComplete ? 'Complete' : 'Drying'}</Text>
+                    </View>
                   </View>
-                  <Text style={styles.cardSubtext}>
-                    {prediction.efficiencyScore >= 80 ? 'Excellent drying conditions' :
-                     prediction.efficiencyScore >= 60 ? 'Good drying conditions detected' :
-                     prediction.efficiencyScore >= 40 ? 'Fair conditions — consider adjustments' :
-                     'Poor conditions — action needed'}
-                  </Text>
                 </View>
 
-                {/* Card 5: Confidence */}
-                <View style={styles.card}>
-                  <View style={styles.cardHeader}>
-                    <Ionicons name="shield-checkmark-outline" size={20} color="#22C55E" />
-                    <Text style={styles.cardTitle}>Model Confidence</Text>
-                  </View>
-                  <Text style={styles.confidenceValue}>{prediction.confidence}%</Text>
-                  <View style={styles.confidenceTrack}>
-                    <View style={[styles.confidenceFill, { width: `${prediction.confidence}%`, backgroundColor: prediction.confidence >= 80 ? '#22C55E' : prediction.confidence >= 60 ? '#FBBF24' : '#EF4444' }]} />
-                  </View>
-                  <Text style={styles.cardSubtext}>
-                    {prediction.confidence >= 80 ? 'High — readings are consistent' :
-                     prediction.confidence >= 60 ? 'Moderate — some variation detected' :
-                     'Low — sensor readings inconsistent'}
-                  </Text>
-                </View>
-
-                {/* Card 6: Moisture Trend Chart */}
+                {/* Card 5: Moisture Trend Chart */}
                 <View style={styles.card}>
                   <View style={styles.cardHeader}>
                     <Ionicons name="trending-down-outline" size={20} color="#22C55E" />
@@ -281,11 +290,26 @@ export default function AIPredictionScreen() {
                     <Text style={styles.aiLabelText}>AI-Assisted Projection</Text>
                   </View>
                 </View>
-              </>
+
+                {/* Card 6: Algorithm Info */}
+                <View style={styles.algorithmCard}>
+                  <View style={styles.algorithmRow}>
+                    <Ionicons name="information-circle-outline" size={16} color="#9CA3AF" />
+                    <View style={styles.algorithmInfo}>
+                      <Text style={styles.algorithmText}>AI Model: {prediction.algorithm || 'Rule-based Drying Model v1'}</Text>
+                      <Text style={styles.algorithmSubtext}>Phase 1 — Experimental dataset collection in progress</Text>
+                    </View>
+                  </View>
+                </View>
+              </View>
             ) : (
               <View style={styles.loadingContainer}>
                 <Ionicons name="sparkles-outline" size={48} color="#6B7280" />
                 <Text style={styles.loadingText}>No prediction data available</Text>
+                <TouchableOpacity style={styles.runButton} onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); fetchPrediction(); }} activeOpacity={0.7}>
+                  <Ionicons name="refresh-outline" size={16} color="#22C55E" />
+                  <Text style={styles.runButtonText}>Run Prediction</Text>
+                </TouchableOpacity>
               </View>
             )}
           </ScrollView>
@@ -330,21 +354,23 @@ const styles = StyleSheet.create({
   recommendationText: { fontSize: 15, fontWeight: '500', lineHeight: 22 },
   aiLabel: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 },
   aiLabelText: { ...IOS_TYPOGRAPHY.caption2, color: '#6B7280', fontWeight: '600' },
-  scoreRow: { flexDirection: 'row', alignItems: 'center', gap: 16 },
-  circularProgress: {
-    width: 60, height: 60, borderRadius: 30,
-    backgroundColor: '#E5E7EB', overflow: 'hidden',
-    justifyContent: 'flex-end',
-  },
-  circularFill: { width: '100%', borderRadius: 30 },
-  scoreValue: { fontSize: 32, fontWeight: '700', color: '#111111' },
-  confidenceValue: { fontSize: 28, fontWeight: '700', color: '#111111' },
-  confidenceTrack: { height: 8, backgroundColor: '#E5E7EB', borderRadius: 4, overflow: 'hidden', marginVertical: 4 },
-  confidenceFill: { height: '100%', borderRadius: 4 },
+  statsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  statCell: { flex: 1, minWidth: '45%', backgroundColor: '#F9FAFB', borderRadius: 12, padding: 12, alignItems: 'center', gap: 4 },
+  statLabel: { ...IOS_TYPOGRAPHY.caption2, fontWeight: '600', color: '#6B7280', textTransform: 'uppercase', letterSpacing: 0.5 },
+  statValue: { fontSize: 22, fontWeight: '700', color: '#111111' },
   chart: { borderRadius: 16 },
   targetLine: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8 },
   targetDash: { flex: 1, height: 1, backgroundColor: '#EF4444', borderStyle: 'dashed' },
   targetLabel: { ...IOS_TYPOGRAPHY.caption2, color: '#EF4444', fontWeight: '600' },
+  algorithmCard: { backgroundColor: '#F9FAFB', borderRadius: 12, padding: 12, gap: 4 },
+  algorithmRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
+  algorithmInfo: { flex: 1, gap: 2 },
+  algorithmText: { ...IOS_TYPOGRAPHY.caption1, color: '#6B7280' },
+  algorithmSubtext: { ...IOS_TYPOGRAPHY.caption2, color: '#9CA3AF' },
   loadingContainer: { paddingVertical: 48, alignItems: 'center', gap: 12 },
   loadingText: { ...IOS_TYPOGRAPHY.footnote, color: '#6B7280' },
+  offlineBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#FFF7ED', borderRadius: 12, paddingHorizontal: 8, paddingVertical: 4, marginLeft: 8 },
+  offlineBadgeText: { ...IOS_TYPOGRAPHY.caption2, color: '#F97316', fontWeight: '600' },
+  runButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: '#F0FDF4', borderRadius: 50, paddingVertical: 10, paddingHorizontal: 20, borderWidth: 1.5, borderColor: '#22C55E', marginBottom: 4 },
+  runButtonText: { ...IOS_TYPOGRAPHY.callout, color: '#22C55E', fontWeight: '600' },
 });

@@ -15,11 +15,13 @@ interface AppContextType {
   devices: Device[];
   settings: any;
   isLoading: boolean;
+  isServerOnline: boolean;
   toast: ToastState;
   handleLogout: () => Promise<void>;
   showToast: (message: string, type?: ToastState['type']) => void;
   hideToast: () => void;
   refreshData: () => Promise<void>;
+  checkServerHealth: () => Promise<void>;
 }
 
 const AppContext = createContext<AppContextType>({
@@ -28,11 +30,13 @@ const AppContext = createContext<AppContextType>({
   devices: [],
   settings: null,
   isLoading: false,
+  isServerOnline: true,
   toast: { message: '', type: 'info', visible: false },
   handleLogout: async () => {},
   showToast: () => {},
   hideToast: () => {},
   refreshData: async () => {},
+  checkServerHealth: async () => {},
 });
 
 export function AppProvider({ children }: { children: React.ReactNode }) {
@@ -42,6 +46,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [devices, setDevices] = useState<Device[]>([]);
   const [settings, setSettings] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [isServerOnline, setIsServerOnline] = useState(true);
   const [toast, setToast] = useState<ToastState>({ message: '', type: 'info', visible: false });
 
   const showToast = useCallback((message: string, type: ToastState['type'] = 'info') => {
@@ -69,6 +74,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
   }, [authLogout]);
 
+  const checkServerHealth = useCallback(async () => {
+    try {
+      const online = await grainApi.health.check();
+      setIsServerOnline(online);
+    } catch {
+      setIsServerOnline(false);
+    }
+  }, []);
+
   const refreshData = useCallback(async () => {
     setIsLoading(true);
     try {
@@ -94,11 +108,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         devices,
         settings,
         isLoading,
+        isServerOnline,
         toast,
         handleLogout,
         showToast,
         hideToast,
         refreshData,
+        checkServerHealth,
       }}
     >
       {children}
