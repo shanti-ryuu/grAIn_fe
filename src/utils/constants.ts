@@ -120,7 +120,7 @@ export const NAVIGATION = [
 ];
 
 export const DEFAULT_SETTINGS = {
-  temperatureUnit: 'F',
+  temperatureUnit: 'C',
   notifications: true,
   darkMode: false,
   autoStart: false,

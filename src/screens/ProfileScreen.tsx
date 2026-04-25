@@ -11,6 +11,7 @@ import {
   Modal,
   KeyboardAvoidingView,
   Platform,
+  Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
@@ -224,7 +225,11 @@ export default function ProfileScreen() {
               <TouchableOpacity onPress={handlePickImage} activeOpacity={0.7} style={styles.avatarContainer}>
                 {user?.profileImage ? (
                   <View style={styles.avatarCircle}>
-                    <Ionicons name="person" size={40} color="#22C55E" />
+                    <Image
+                      source={{ uri: `data:image/jpeg;base64,${user.profileImage}` }}
+                      style={styles.avatarImage}
+                      resizeMode="cover"
+                    />
                   </View>
                 ) : (
                   <View style={styles.avatarCircle}>
@@ -468,7 +473,9 @@ const styles = StyleSheet.create({
     width: 80, height: 80, borderRadius: 40,
     backgroundColor: '#DCFCE7', borderWidth: 3, borderColor: '#22C55E',
     alignItems: 'center', justifyContent: 'center',
+    overflow: 'hidden',
   },
+  avatarImage: { width: 80, height: 80, borderRadius: 40 },
   avatarInitials: { fontSize: 28, fontWeight: '700', color: '#22C55E' },
   cameraOverlay: {
     position: 'absolute', bottom: 0, right: 0,

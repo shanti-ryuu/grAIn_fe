@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -45,6 +45,7 @@ export default function AIPredictionScreen() {
   const [prediction, setPrediction] = useState<AIPrediction | null>(null);
   const [isOfflineFallback, setIsOfflineFallback] = useState(false);
   const { showToast } = useAppContext();
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const fetchPrediction = useCallback(async () => {
     try {
@@ -103,6 +104,10 @@ export default function AIPredictionScreen() {
 
   useEffect(() => {
     fetchPrediction();
+    intervalRef.current = setInterval(fetchPrediction, 60000);
+    return () => {
+      if (intervalRef.current) clearInterval(intervalRef.current);
+    };
   }, [fetchPrediction]);
 
   const onRefresh = useCallback(async () => {

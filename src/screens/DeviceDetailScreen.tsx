@@ -250,7 +250,7 @@ export default function DeviceDetailScreen({ deviceId }: DeviceDetailScreenProps
 
           <View style={s.bottomBanner}>
             <View style={s.bannerL}><View style={[s.bannerDot, { backgroundColor: isRunning ? '#22C55E' : '#9CA3AF' }]} /><Text style={s.bannerTxt}>{isRunning ? 'System Running' : 'System Idle'}</Text></View>
-            <TouchableOpacity style={s.ctrlBtn} onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push('/(app)/control' as any); }} activeOpacity={0.7}><Text style={s.ctrlBtnTxt}>Control</Text></TouchableOpacity>
+            <TouchableOpacity style={s.ctrlBtn} onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push({ pathname: '/(app)/control', params: { deviceId: device.deviceId } } as any); }} activeOpacity={0.7}><Text style={s.ctrlBtnTxt}>Control</Text></TouchableOpacity>
           </View>
         </ScrollView>
         </Animated.View>

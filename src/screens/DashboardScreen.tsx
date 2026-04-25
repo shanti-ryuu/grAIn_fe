@@ -103,10 +103,16 @@ export default function DashboardScreen() {
             refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#22C55E" />}
             contentContainerStyle={styles.scrollContent}
           >
-            {/* Drying Alert Banner */}
+            {/* Drying Alert Banner — uses real sensor data when available */}
             {devices.some(d => d.status === 'online') && (
               (() => {
-                const alert = analyzeDryingStatus(20, 14, 45);
+                const onlineDevice = devices.find(d => d.status === 'online');
+                const alert = analyzeDryingStatus(
+                  (onlineDevice as any)?.latestMoisture ?? 20,
+                  14,
+                  (onlineDevice as any)?.latestTemperature ?? 45,
+                );
+                if (alert.type === 'normal') return null;
                 const alertColors: Record<string, { bg: string; border: string; text: string; icon: string }> = {
                   critical: { bg: '#FEE2E2', border: '#EF4444', text: '#DC2626', icon: 'alert-circle' },
                   warning: { bg: '#FEF9C3', border: '#F59E0B', text: '#D97706', icon: 'warning' },

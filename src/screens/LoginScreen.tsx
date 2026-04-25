@@ -106,7 +106,7 @@ export default function LoginScreen() {
   const handleDemoLogin = async () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     try {
-      await login('demo@grain.com', 'demo123');
+      await login('admin@grain.com', 'admin123');
       router.replace('/(app)/dashboard');
     } catch (err: any) {
       Alert.alert('Demo Login Failed', 'Demo account not available');

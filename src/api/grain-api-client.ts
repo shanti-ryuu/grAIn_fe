@@ -384,6 +384,10 @@ class GrainApiClient {
     clear: async (): Promise<void> => {
       await this.client.delete('/alerts')
     },
+
+    markRead: async (id: string | number): Promise<void> => {
+      await this.client.patch(`/alerts/${id}/read`)
+    },
   }
 
   // ─── Analytics ────────────────────────────────────────────

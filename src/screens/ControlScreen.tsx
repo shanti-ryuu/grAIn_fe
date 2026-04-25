@@ -29,7 +29,7 @@ export default function ControlScreen() {
   const [selectedDevice, setSelectedDevice] = useState<Device | null>(null);
   const [mode, setMode] = useState<'auto' | 'manual'>('auto');
   const [isRunning, setIsRunning] = useState(false);
-  const [temperature, setTemperature] = useState(65.5);
+  const [temperature, setTemperature] = useState(55);
   const [fanSpeed, setFanSpeed] = useState(75);
   const [isControlling, setIsControlling] = useState(false);
   const [aiAutoStopped, setAiAutoStopped] = useState(false);
@@ -342,8 +342,8 @@ export default function ControlScreen() {
                   <CustomSlider
                     label=""
                     value={temperature}
-                    minimumValue={40}
-                    maximumValue={120}
+                    minimumValue={30}
+                    maximumValue={70}
                     step={0.5}
                     unit=" °C"
                     onValueChange={setTemperature}

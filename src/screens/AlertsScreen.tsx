@@ -116,8 +116,13 @@ export default function AlertsScreen() {
     setUnreadIds((prev) => { const next = new Set(prev); next.delete(id); return next; });
   };
 
-  const handleMarkRead = (id: string | number) => {
+  const handleMarkRead = async (id: string | number) => {
     setUnreadIds((prev) => { const next = new Set(prev); next.delete(id); return next; });
+    try {
+      await grainApi.alerts.markRead(id);
+    } catch {
+      // Silently fail — local state already updated
+    }
   };
 
   const handleMarkAllRead = () => {
