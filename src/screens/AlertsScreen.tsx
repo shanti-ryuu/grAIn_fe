@@ -21,22 +21,23 @@ import { Header, Navigation, AlertCard } from '@/components';
 import { grainApi } from '@/api';
 import { useAppContext } from '@/context/AppContext';
 import { GRADIENTS, IOS_TYPOGRAPHY } from '@/utils/constants';
+import { AlertType } from '@/utils/enums';
 
 interface AlertEntry {
   id: string | number;
-  severity: 'success' | 'info' | 'warning' | 'error';
+  severity: AlertType;
   title: string;
   message: string;
   timestamp: string;
 }
 
-type FilterType = 'all' | 'info' | 'warning' | 'error';
+type FilterType = 'all' | AlertType;
 
 const FILTER_CONFIG: { key: FilterType; label: string; color: string; activeBg: string }[] = [
   { key: 'all', label: 'All', color: '#22C55E', activeBg: '#22C55E' },
-  { key: 'error', label: 'Critical', color: '#EF4444', activeBg: '#EF4444' },
-  { key: 'warning', label: 'Warnings', color: '#F97316', activeBg: '#F97316' },
-  { key: 'info', label: 'Info', color: '#3B82F6', activeBg: '#3B82F6' },
+  { key: AlertType.Error, label: 'Critical', color: '#EF4444', activeBg: '#EF4444' },
+  { key: AlertType.Warning, label: 'Warnings', color: '#F97316', activeBg: '#F97316' },
+  { key: AlertType.Info, label: 'Info', color: '#3B82F6', activeBg: '#3B82F6' },
 ];
 
 export default function AlertsScreen() {

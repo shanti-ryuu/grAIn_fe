@@ -15,6 +15,7 @@ import { useAppContext } from '@/context/AppContext';
 import { useDevices } from '@/hooks';
 import { Header, Navigation, StatusBadge } from '@/components';
 import { DEFAULT_SETTINGS, GRADIENTS, IOS_TYPOGRAPHY } from '@/utils/constants';
+import { StorageKeys, UserRole, DeviceStatus, DryerStatus } from '@/utils/enums';
 
 const SETTINGS_KEY = 'grain_settings';
 
@@ -63,7 +64,7 @@ export default function SettingsScreen() {
         onPress: async () => {
           try {
             await logout();
-            await SecureStore.deleteItemAsync('grain_token').catch(() => {});
+            await SecureStore.deleteItemAsync(StorageKeys.AuthToken).catch(() => {});
             router.replace('/(auth)/login');
           } catch (err) {
             console.error('Logout error:', err);
@@ -116,7 +117,7 @@ export default function SettingsScreen() {
                     <Ionicons name="shield-checkmark-outline" size={20} color="#6B7280" />
                     <View>
                       <Text style={styles.settingLabel}>Role</Text>
-                      <Text style={styles.settingDesc}>{user?.role || 'farmer'}</Text>
+                      <Text style={styles.settingDesc}>{user?.role || UserRole.Farmer}</Text>
                     </View>
                   </View>
                 </View>
@@ -132,13 +133,13 @@ export default function SettingsScreen() {
               devices.map((device, idx) => (
                 <View key={device._id || device.deviceId || idx} style={styles.deviceRow}>
                   <View style={styles.deviceInfo}>
-                    <Ionicons name="hardware-chip-outline" size={20} color={device.status === 'online' ? '#22C55E' : 'rgba(0,0,0,0.3)'} />
+                    <Ionicons name="hardware-chip-outline" size={20} color={device.status === DeviceStatus.Online ? '#22C55E' : 'rgba(0,0,0,0.3)'} />
                     <View style={styles.deviceText}>
                       <Text style={styles.deviceName}>{device.name || device.deviceId}</Text>
                       <Text style={styles.deviceSub}>{device.location || 'No location'}</Text>
                     </View>
                   </View>
-                  <StatusBadge status={device.status === 'online' ? 'running' : 'offline'} size="sm" />
+                  <StatusBadge status={device.status === DeviceStatus.Online ? DryerStatus.Running : DeviceStatus.Offline} size="sm" />
                 </View>
               ))
             )}

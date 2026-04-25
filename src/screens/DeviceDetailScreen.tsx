@@ -14,6 +14,7 @@ import { StatusBadge, Header, Navigation, GrainDryingSimulation, ProgressBar } f
 import { grainApi } from '@/api';
 import { useAppContext } from '@/context/AppContext';
 import { GRADIENTS, IOS_TYPOGRAPHY } from '@/utils/constants';
+import { DeviceStatus, DryerStatus, DryerMode } from '@/utils/enums';
 import { analyzeDryingStatus } from '@/utils/dryingAlerts';
 
 interface DeviceDetailScreenProps { deviceId?: string; }
@@ -71,7 +72,7 @@ export default function DeviceDetailScreen({ deviceId }: DeviceDetailScreenProps
           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
           setIsControlling(true);
           try {
-            await grainApi.dryer.start(deviceId, 'auto');
+            await grainApi.dryer.start(deviceId, DryerMode.Auto);
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
             showToast('Dryer started successfully', 'success');
             addCommand('START (auto)');
@@ -142,8 +143,8 @@ export default function DeviceDetailScreen({ deviceId }: DeviceDetailScreenProps
   const energy = liveData?.energy ?? 2.4;
   const fanSpeed = liveData?.fanSpeed ?? 75;
   const status = liveData?.status ?? 'idle';
-  const isOnline = rtOnline || device.status === 'online';
-  const isRunning = status === 'running' || status === 'drying';
+  const isOnline = rtOnline || device.status === DeviceStatus.Online;
+  const isRunning = status === DryerStatus.Running || status === 'drying';
   const targetM = 14;
   const progress = moisture <= targetM ? 100 : Math.max(0, Math.round(((100 - moisture) / (100 - targetM)) * 100));
 
@@ -169,7 +170,7 @@ export default function DeviceDetailScreen({ deviceId }: DeviceDetailScreenProps
               <Text style={s.greetSub}>Monitor your grain dryer</Text>
             </View>
             <View style={s.statusRow}>
-              <StatusBadge status={isOnline ? 'running' : 'offline'} size="md" />
+              <StatusBadge status={isOnline ? DryerStatus.Running : DeviceStatus.Offline} size="md" />
               {fbConnected && (<View style={s.liveBadge}><View style={s.liveDot} /><Text style={s.liveTxt}>LIVE</Text></View>)}
             </View>
           </View>

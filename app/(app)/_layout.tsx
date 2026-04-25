@@ -1,31 +1,24 @@
 import { Stack, Redirect } from 'expo-router';
-import { useAuth } from '@/context/AuthContext';
-import { View, ActivityIndicator } from 'react-native';
-import { ConnectionBanner } from '@/components';
+import { useAuth } from '@/hooks/useAuth';
+import { View } from 'react-native';
+import { ConnectionBanner, ReconnectingBanner } from '@/components';
+import { LoadingScreen } from '@/components/LoadingScreen';
 
 export default function AppLayout() {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, isLoading, isReconnecting } = useAuth();
 
-  if (isLoading) {
-    return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-        <ActivityIndicator size="large" color="#22C55E" />
-      </View>
-    );
-  }
-
-  if (!isAuthenticated) {
-    return <Redirect href="/(auth)/login" />;
-  }
+  if (isLoading) return <LoadingScreen />;
+  if (!isAuthenticated) return <Redirect href="/(auth)/login" />;
 
   return (
     <View style={{ flex: 1 }}>
+      {isReconnecting && <ReconnectingBanner />}
       <ConnectionBanner />
       <Stack screenOptions={{ headerShown: false, animation: 'slide_from_right' }}>
         <Stack.Screen name="dashboard" />
         <Stack.Screen name="control" />
-        <Stack.Screen name="analytics" />
         <Stack.Screen name="ai-prediction" />
+        <Stack.Screen name="analytics" />
         <Stack.Screen name="alerts" />
         <Stack.Screen name="settings" />
         <Stack.Screen name="profile" />

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { ref, onValue, off } from 'firebase/database'
 import { db } from '@/lib/firebase'
+import { DeviceStatus } from '@/utils/enums'
 
 export interface RealtimeSensorData {
   temperature: number
@@ -32,7 +33,7 @@ export function useRealtimeSensor(deviceId?: string) {
     })
 
     const unsubscribeStatus = onValue(statusRef, (snapshot) => {
-      setIsOnline(snapshot.val() === 'online')
+      setIsOnline(snapshot.val() === DeviceStatus.Online)
     })
 
     return () => {

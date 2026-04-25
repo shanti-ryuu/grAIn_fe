@@ -1,3 +1,5 @@
+import { SensorThreshold } from '@/utils/enums';
+
 export interface DryingAlert {
   type: 'over_drying' | 'under_drying' | 'complete' | 'normal';
   severity: 'info' | 'warning' | 'critical';
@@ -5,14 +7,14 @@ export interface DryingAlert {
   action: string;
 }
 
-const TARGET_MOISTURE = 14;
+const TARGET_MOISTURE = SensorThreshold.MoistureTarget;
 
 export function analyzeDryingStatus(
   currentMoisture: number,
   targetMoisture: number = TARGET_MOISTURE,
   temperature: number,
 ): DryingAlert {
-  if (currentMoisture < 10) {
+  if (currentMoisture < SensorThreshold.MoistureMin) {
     return {
       type: 'over_drying',
       severity: 'critical',
@@ -21,7 +23,7 @@ export function analyzeDryingStatus(
     };
   }
 
-  if (currentMoisture <= targetMoisture && currentMoisture >= 10) {
+  if (currentMoisture <= targetMoisture && currentMoisture >= SensorThreshold.MoistureMin) {
     return {
       type: 'complete',
       severity: 'info',
@@ -30,7 +32,7 @@ export function analyzeDryingStatus(
     };
   }
 
-  if (temperature > 65) {
+  if (temperature > SensorThreshold.HighTempRisk) {
     return {
       type: 'over_drying',
       severity: 'warning',

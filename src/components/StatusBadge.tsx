@@ -1,8 +1,9 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
+import { DeviceStatus, DryerStatus, AlertType } from '@/utils/enums';
 
 interface StatusBadgeProps {
-  status?: 'online' | 'offline' | 'running' | 'idle' | 'error' | 'paused';
+  status?: DeviceStatus | DryerStatus | AlertType | 'paused' | 'drying';
   label?: string;
   size?: 'sm' | 'md' | 'lg';
 }
@@ -24,7 +25,7 @@ const SIZE_CONFIG = {
 };
 
 export default function StatusBadge({
-  status = 'online',
+  status = DeviceStatus.Online,
   label,
   size = 'md',
 }: StatusBadgeProps) {

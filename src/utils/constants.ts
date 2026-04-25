@@ -65,26 +65,8 @@ export const IOS_TYPOGRAPHY = {
   caption2: { fontSize: 11, fontWeight: '400' as const },
 };
 
-export const STATUS = {
-  RUNNING: 'running',
-  IDLE: 'idle',
-  PAUSED: 'paused',
-  ERROR: 'error',
-  MAINTENANCE: 'maintenance',
-};
-
-export const ALERT_TYPES = {
-  INFO: 'info',
-  WARNING: 'warning',
-  CRITICAL: 'critical',
-};
-
-export const DEVICE_STATUS = {
-  ACTIVE: 'active',
-  IDLE: 'idle',
-  OFFLINE: 'offline',
-  ERROR: 'error',
-};
+// Re-export enums for backward compatibility
+export { DryerMode, DryerStatus, DeviceStatus, AlertType, SensorThreshold, StorageKeys, ApiTimeout, UserRole } from './enums';
 
 export const TEMPERATURE_RANGE = {
   MIN: 50,
@@ -127,14 +109,5 @@ export const DEFAULT_SETTINGS = {
   maintenanceReminder: true,
 };
 
-export const SENSOR_THRESHOLDS = {
-  TARGET_MOISTURE: 14,
-  MIN_MOISTURE: 10,
-  OPT_TEMP_MIN: 40,
-  OPT_TEMP_MAX: 60,
-  OPT_HUMIDITY_MAX: 60,
-  OPT_FAN_MIN: 70,
-  OPT_FAN_MAX: 90,
-  CRITICAL_TEMP_MAX: 80,
-  CRITICAL_HUMIDITY_MAX: 80,
-};
+// SENSOR_THRESHOLDS moved to SensorThreshold enum in enums.ts
+// Use SensorThreshold.MoistureTarget, SensorThreshold.MoistureMin, etc.

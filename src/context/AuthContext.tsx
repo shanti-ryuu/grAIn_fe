@@ -2,6 +2,7 @@ import React, { createContext, useContext, useReducer, useEffect, useCallback, u
 import * as SecureStore from 'expo-secure-store';
 import { grainApi, isNetworkError } from '@/api';
 import type { User } from '@/api';
+import { StorageKeys, ApiTimeout } from '@/utils/enums';
 
 interface AuthState {
   user: User | null;
@@ -88,7 +89,7 @@ const AuthContext = createContext<AuthContextType>({
   updateProfileImage: async () => {},
 });
 
-const RESTORE_AUTH_TIMEOUT = 10000; // 10s timeout for startup auth check (vs 30s default)
+const RESTORE_AUTH_TIMEOUT = ApiTimeout.Startup; // 10s timeout for startup auth check (vs 30s default)
 const RECONNECT_INTERVAL = 15000; // retry every 15s when reconnecting
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -113,7 +114,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             return;
           }
           // Got a real response (e.g. 401) — token is invalid
-          await SecureStore.deleteItemAsync('grain_token').catch(() => {});
+          await SecureStore.deleteItemAsync(StorageKeys.AuthToken).catch(() => {});
           dispatch({ type: 'AUTH_LOGOUT' });
         }
       }, RECONNECT_INTERVAL);
@@ -132,7 +133,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const restoreAuth = async () => {
     try {
-      const token = await SecureStore.getItemAsync('grain_token');
+      const token = await SecureStore.getItemAsync(StorageKeys.AuthToken);
       if (token) {
         try {
           // Use shorter timeout for startup — don't block the app for 30s
@@ -152,7 +153,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             dispatch({ type: 'OPTIMISTIC_AUTH' });
           } else {
             // 401 or other server errors — token is invalid, logout
-            await SecureStore.deleteItemAsync('grain_token').catch(() => {});
+            await SecureStore.deleteItemAsync(StorageKeys.AuthToken).catch(() => {});
             dispatch({ type: 'AUTH_LOGOUT' });
           }
         }

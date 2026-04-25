@@ -7,6 +7,7 @@ import { useRouter } from 'expo-router';
 import { useAuth } from '@/hooks';
 import { useAppContext } from '@/context/AppContext';
 import { IOS_TYPOGRAPHY } from '@/utils/constants';
+import { StorageKeys } from '@/utils/enums';
 
 export default function Header() {
   const { handleLogout } = useAppContext();
@@ -24,7 +25,7 @@ export default function Header() {
           try {
             await handleLogout();
             await authLogout();
-            await SecureStore.deleteItemAsync('grain_token').catch(() => {});
+            await SecureStore.deleteItemAsync(StorageKeys.AuthToken).catch(() => {});
             router.replace('/(auth)/login');
           } catch (err) {
             console.error('Logout error:', err);

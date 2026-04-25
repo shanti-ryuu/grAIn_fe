@@ -1,12 +1,13 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { AlertType } from '@/utils/enums';
 
 type IoniconName = React.ComponentProps<typeof Ionicons>['name'];
 
 interface AlertData {
   id: string | number;
-  severity?: 'success' | 'info' | 'warning' | 'error';
+  severity?: AlertType;
   title?: string;
   message?: string;
   timestamp?: string;

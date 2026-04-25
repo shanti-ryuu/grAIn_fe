@@ -22,12 +22,13 @@ import { useAppContext } from '@/context/AppContext';
 import { useAIPrediction, runPrediction } from '@/hooks/useAIPrediction';
 import type { SensorInput, AIPrediction } from '@/hooks/useAIPrediction';
 import { GRADIENTS, IOS_TYPOGRAPHY } from '@/utils/constants';
+import { DryerMode, DryerStatus } from '@/utils/enums';
 
 export default function ControlScreen() {
   const { showToast } = useAppContext();
   const { devices, isLoading: devicesLoading } = useDevices();
   const [selectedDevice, setSelectedDevice] = useState<Device | null>(null);
-  const [mode, setMode] = useState<'auto' | 'manual'>('auto');
+  const [mode, setMode] = useState<DryerMode>(DryerMode.Auto);
   const [isRunning, setIsRunning] = useState(false);
   const [temperature, setTemperature] = useState(55);
   const [fanSpeed, setFanSpeed] = useState(75);
@@ -46,7 +47,7 @@ export default function ControlScreen() {
 
   // AI prediction polling in AUTO mode when running
   useEffect(() => {
-    if (mode !== 'auto' || !isRunning || !deviceId) return;
+    if (mode !== DryerMode.Auto || !isRunning || !deviceId) return;
 
     const fetchAIPrediction = async () => {
       setAiLoading(true);
@@ -147,7 +148,7 @@ export default function ControlScreen() {
     const deviceName = selectedDevice?.name || deviceId;
     Alert.alert(
       'Start Dryer',
-      `Start drying cycle?\n\nDevice: ${deviceName}\nMode: ${mode === 'auto' ? 'AI Auto' : 'Manual'}\n${mode === 'manual' ? `Temp: ${temperature.toFixed(1)}°C\nFan: ${fanSpeed}%` : 'AI will adjust settings automatically'}`,
+      `Start drying cycle?\n\nDevice: ${deviceName}\nMode: ${mode === DryerMode.Auto ? 'AI Auto' : 'Manual'}\n${mode === DryerMode.Manual ? `Temp: ${temperature.toFixed(1)}°C\nFan: ${fanSpeed}%` : 'AI will adjust settings automatically'}`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -186,7 +187,7 @@ export default function ControlScreen() {
               <Text style={styles.screenTitle}>Control System</Text>
               <Text style={styles.screenSubtitle}>Manage dryer settings and operation</Text>
             </View>
-            <StatusBadge status={isRunning ? 'running' : 'idle'} size="md" />
+            <StatusBadge status={isRunning ? DryerStatus.Running : DryerStatus.Idle} size="md" />
           </View>
 
           {/* Device Selector */}
@@ -283,11 +284,11 @@ export default function ControlScreen() {
                 )}
 
                 <Text style={[styles.cardLabel, { marginTop: 24 }]}>OPERATING MODE</Text>
-                <ModeToggle mode={mode} onModeChange={(m: string) => setMode(m as 'auto' | 'manual')} />
+                <ModeToggle mode={mode} onModeChange={(m: string) => setMode(m as DryerMode)} />
               </View>
 
               {/* AI Auto Mode Banner */}
-              {mode === 'auto' && isRunning && (
+              {mode === DryerMode.Auto && isRunning && (
                 <View style={styles.aiCard}>
                   <View style={styles.aiCardHeader}>
                     <View style={styles.aiActiveBadge}>
@@ -326,15 +327,15 @@ export default function ControlScreen() {
               )}
 
               {/* Manual sliders — disabled in auto mode */}
-              <View style={[styles.card, mode === 'auto' && styles.cardDisabled]}>
+              <View style={[styles.card, mode === DryerMode.Auto && styles.cardDisabled]}>
                 <Text style={styles.cardLabel}>ADVANCED SETTINGS</Text>
-                {mode === 'auto' && (
+                {mode === DryerMode.Auto && (
                   <View style={styles.disabledOverlay}>
                     <Ionicons name="lock-closed-outline" size={16} color="#9CA3AF" />
                     <Text style={styles.disabledText}>Manual control disabled in Auto mode</Text>
                   </View>
                 )}
-                <View style={[styles.sliderSection, mode === 'auto' && styles.sliderDisabled]}>
+                <View style={[styles.sliderSection, mode === DryerMode.Auto && styles.sliderDisabled]}>
                   <View style={styles.sliderHeader}>
                     <Text style={styles.sliderLabel}>Temperature</Text>
                     <Text style={styles.sliderValue}>{temperature.toFixed(1)} °C</Text>
@@ -350,7 +351,7 @@ export default function ControlScreen() {
                   />
                 </View>
 
-                <View style={[styles.sliderSection, mode === 'auto' && styles.sliderDisabled]}>
+                <View style={[styles.sliderSection, mode === DryerMode.Auto && styles.sliderDisabled]}>
                   <View style={styles.sliderHeader}>
                     <Text style={styles.sliderLabel}>Fan Speed</Text>
                     <Text style={styles.sliderValue}>{fanSpeed} %</Text>
@@ -372,7 +373,7 @@ export default function ControlScreen() {
                 <View style={styles.presetsRow}>
                   <TouchableOpacity
                     style={[styles.presetButton, styles.presetHigh]}
-                    onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setTemperature(90); setFanSpeed(100); setMode('manual'); }}
+                    onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setTemperature(90); setFanSpeed(100); setMode(DryerMode.Manual); }}
                     activeOpacity={0.7}
                   >
                     <Ionicons name="flame-outline" size={18} color="#EF4444" />
@@ -380,7 +381,7 @@ export default function ControlScreen() {
                   </TouchableOpacity>
                   <TouchableOpacity
                     style={[styles.presetButton, styles.presetMedium]}
-                    onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setTemperature(65); setFanSpeed(60); setMode('manual'); }}
+                    onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setTemperature(65); setFanSpeed(60); setMode(DryerMode.Manual); }}
                     activeOpacity={0.7}
                   >
                     <Ionicons name="settings-outline" size={18} color="#D97706" />

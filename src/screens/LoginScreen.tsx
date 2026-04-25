@@ -20,6 +20,7 @@ import { useAuth } from '@/hooks';
 import { grainApi } from '@/api';
 import { useRouter } from 'expo-router';
 import { GRADIENTS, IOS_TYPOGRAPHY } from '@/utils/constants';
+import { DeviceStatus } from '@/utils/enums';
 
 const isValidEmail = (email: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 
@@ -113,8 +114,8 @@ export default function LoginScreen() {
     }
   };
 
-  const serverStatusColor = serverStatus === 'online' ? '#22C55E' : serverStatus === 'offline' ? '#EF4444' : '#FBBF24';
-  const serverStatusText = serverStatus === 'checking' ? 'Checking...' : serverStatus === 'online' ? 'Online' : 'Offline';
+  const serverStatusColor = serverStatus === DeviceStatus.Online ? '#22C55E' : serverStatus === DeviceStatus.Offline ? '#EF4444' : '#FBBF24';
+  const serverStatusText = serverStatus === 'checking' ? 'Checking...' : serverStatus === DeviceStatus.Online ? 'Online' : 'Offline';
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>

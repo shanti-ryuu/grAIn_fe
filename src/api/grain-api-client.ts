@@ -5,6 +5,7 @@
 
 import axios, { AxiosInstance } from 'axios'
 import * as SecureStore from 'expo-secure-store'
+import { StorageKeys, ApiTimeout, UserRole, DryerMode, AlertType, DeviceStatus, DryerStatus } from '@/utils/enums'
 
 // ─── Data Models (matching backend) ───────────────────────────
 
@@ -12,7 +13,7 @@ export interface User {
   _id: string
   name: string
   email: string
-  role: 'farmer' | 'admin'
+  role: UserRole
   profileImage?: string | null
   bio?: string
   phoneNumber?: string
@@ -24,7 +25,7 @@ export interface Device {
   deviceId: string
   name: string
   location: string
-  status: 'online' | 'offline' | 'idle'
+  status: DeviceStatus
   isOnline: boolean
   lastSeen: string
 }
@@ -44,7 +45,7 @@ export interface SensorData {
 export interface AlertItem {
   _id: string
   deviceId?: string
-  severity: 'info' | 'warning' | 'error' | 'success'
+  severity: AlertType
   title: string
   message: string
   timestamp: string
@@ -57,7 +58,7 @@ export interface Command {
   command: 'start' | 'stop'
   status: 'pending' | 'executed' | 'failed'
   parameters: {
-    mode: 'auto' | 'manual'
+    mode: DryerMode
     temperature?: number
     fanSpeed?: number
   }
@@ -112,7 +113,7 @@ export interface ApiResponse<T> {
 
 // ─── API Client ───────────────────────────────────────────────
 
-const TOKEN_KEY = 'grain_token'
+const TOKEN_KEY = StorageKeys.AuthToken
 
 class GrainApiClient {
   private client: AxiosInstance
@@ -125,7 +126,7 @@ class GrainApiClient {
     this.client = axios.create({
       baseURL: this.baseURL,
       headers: { 'Content-Type': 'application/json' },
-      timeout: 30000,
+      timeout: ApiTimeout.Default,
     })
 
     this.client.interceptors.request.use(
@@ -210,7 +211,7 @@ class GrainApiClient {
       throw new Error('Invalid login response')
     },
 
-    register: async (name: string, email: string, password: string, role: string = 'farmer'): Promise<{ token: string; user: User }> => {
+    register: async (name: string, email: string, password: string, role: string = UserRole.Farmer): Promise<{ token: string; user: User }> => {
       const response = await this.client.post<ApiResponse<{ token: string; user: User }>>(
         '/auth/register',
         { name, email, password, role }
@@ -330,7 +331,7 @@ class GrainApiClient {
   dryer = {
     start: async (
       deviceId: string,
-      mode: 'auto' | 'manual',
+      mode: DryerMode,
       temperature?: number,
       fanSpeed?: number
     ): Promise<Command> => {
@@ -477,7 +478,7 @@ class GrainApiClient {
     check: async (timeoutMs?: number): Promise<boolean> => {
       try {
         const response = await this.client.get('/health', {
-          timeout: timeoutMs ?? 10000,
+          timeout: timeoutMs ?? ApiTimeout.Startup,
         })
         return response.status === 200
       } catch {

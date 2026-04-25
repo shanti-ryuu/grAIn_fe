@@ -1,5 +1,6 @@
 export { default as AlertCard } from './AlertCard';
 export { default as ConnectionBanner } from './ConnectionBanner';
+export { ReconnectingBanner } from './ReconnectingBanner';
 export { default as Button } from './Button';
 export { default as GlobalToast } from './GlobalToast';
 export { default as Card } from './Card';
@@ -9,7 +10,7 @@ export { default as ErrorBoundary } from './ErrorBoundary';
 export { default as GlassCard } from './GlassCard';
 export { default as GrainDryingSimulation } from './GrainDryingSimulation';
 export { default as Header } from './Header';
-export { default as LoadingScreen } from './LoadingScreen';
+export { LoadingScreen } from './LoadingScreen';
 export { default as LoadingSkeleton } from './LoadingSkeleton';
 export { default as ModeToggle } from './ModeToggle';
 export { default as Navigation } from './Navigation';

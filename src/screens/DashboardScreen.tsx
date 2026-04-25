@@ -19,6 +19,7 @@ import { db } from '@/lib/firebase';
 import { useDevices } from '@/hooks';
 import { Header, Navigation, StatusBadge } from '@/components';
 import { GRADIENTS, IOS_TYPOGRAPHY } from '@/utils/constants';
+import { DeviceStatus } from '@/utils/enums';
 import { analyzeDryingStatus } from '@/utils/dryingAlerts';
 import type { Device } from '@/api';
 
@@ -104,9 +105,9 @@ export default function DashboardScreen() {
             contentContainerStyle={styles.scrollContent}
           >
             {/* Drying Alert Banner — uses real sensor data when available */}
-            {devices.some(d => d.status === 'online') && (
+            {devices.some(d => d.status === DeviceStatus.Online) && (
               (() => {
-                const onlineDevice = devices.find(d => d.status === 'online');
+                const onlineDevice = devices.find(d => d.status === DeviceStatus.Online);
                 const alert = analyzeDryingStatus(
                   (onlineDevice as any)?.latestMoisture ?? 20,
                   14,
@@ -202,16 +203,16 @@ export default function DashboardScreen() {
                 >
                   <View style={styles.deviceCard}>
                     <View style={styles.deviceLeft}>
-                      <View style={[styles.deviceIconCircle, { backgroundColor: device.status === 'online' ? '#DCFCE7' : '#F3F4F6' }]}>
-                        <Ionicons name="hardware-chip-outline" size={20} color={device.status === 'online' ? '#22C55E' : '#9CA3AF'} />
+                      <View style={[styles.deviceIconCircle, { backgroundColor: device.status === DeviceStatus.Online ? '#DCFCE7' : '#F3F4F6' }]}>
+                        <Ionicons name="hardware-chip-outline" size={20} color={device.status === DeviceStatus.Online ? '#22C55E' : '#9CA3AF'} />
                       </View>
                       <View style={styles.deviceInfo}>
                         <Text style={styles.deviceName}>{device.name || device.deviceId}</Text>
                         <Text style={styles.deviceLocation}>{device.location || 'No location'}</Text>
-                        <Text style={styles.deviceMeta}>{device.deviceId} · {device.status === 'online' ? 'Active now' : 'Offline'}</Text>
+                        <Text style={styles.deviceMeta}>{device.deviceId} · {device.status === DeviceStatus.Online ? 'Active now' : 'Offline'}</Text>
                       </View>
                     </View>
-                    <StatusBadge status={device.status === 'online' ? 'online' : 'offline'} size="md" />
+                    <StatusBadge status={device.status === DeviceStatus.Online ? DeviceStatus.Online : DeviceStatus.Offline} size="md" />
                   </View>
                 </TouchableOpacity>
               ))
